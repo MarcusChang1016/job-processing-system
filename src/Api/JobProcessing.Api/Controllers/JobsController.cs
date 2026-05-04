@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using JobProcessing.Api.Models;
+using JobProcessing.Api.Services;
 
 namespace JobProcessing.Api.Controllers;
 
@@ -7,12 +8,17 @@ namespace JobProcessing.Api.Controllers;
 [Route("jobs")]
 public class JobsController : ControllerBase
 {
-    private static readonly List<Job> _jobs = new();
+    private readonly JobStore _jobStore;
+
+    public JobsController(JobStore jobStore)
+    {
+        _jobStore = jobStore;
+    }
 
     [HttpGet("{id}")]
     public IActionResult GetJob(Guid id)
     {
-        var job = _jobs.FirstOrDefault(j => j.Id == id);
+        var job = _jobStore.GetJob(id);
 
         if (job == null) return NotFound();
 
@@ -38,7 +44,7 @@ public class JobsController : ControllerBase
             RetryCount = 0
         };
 
-        _jobs.Add(job);
+        _jobStore.AddJob(job);
 
         return Ok(new
         {
