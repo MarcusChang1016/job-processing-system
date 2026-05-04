@@ -6,6 +6,7 @@ public class JobWorker : BackgroundService
 {
     private readonly ILogger<JobWorker> _logger;
     private readonly JobStore _jobStore;
+    private readonly Random _random = new();
 
     public JobWorker(JobStore jobStore, ILogger<JobWorker> logger)
     {
@@ -36,8 +37,7 @@ public class JobWorker : BackgroundService
                 await Task.Delay(2000, stoppingToken);
 
                 // Simulate random failure / success
-                var random = new Random();
-                bool isFailed = random.Next(0, 2) == 0; // 50% chance of failure
+                bool isFailed = _random.Next(0, 2) == 0; // 50% chance of failure
 
                 JobResult result;
 
