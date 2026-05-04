@@ -52,4 +52,27 @@ public class JobsController : ControllerBase
             status = job.Status,
         });
     }
+
+    [HttpPost("{id}/retry")]
+    public IActionResult RetryJob(Guid id)
+    {
+        var job = _jobStore.GetJob(id);
+
+        if (job == null) return NotFound();
+
+        if (job.Status != "Failed") return BadRequest("Only failed jobs can be retried.");
+
+        job.Status = "Pending";
+        job.RetryCount += 1;
+        job.UpdatedAt = DateTime.UtcNow;
+
+        _jobStore.UpdateJob(job);
+
+        return Ok(new
+        {
+            id = job.Id,
+            status = job.Status,
+            retryCount = job.RetryCount
+        });
+    }
 }

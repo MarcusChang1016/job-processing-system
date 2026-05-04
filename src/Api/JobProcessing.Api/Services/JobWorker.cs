@@ -31,11 +31,25 @@ public class JobWorker : BackgroundService
                 // Simulate processing time
                 await Task.Delay(2000, stoppingToken);
 
-                // Mark job as succeeded
-                job.Status = "Succeeded";
-                job.UpdatedAt = DateTime.UtcNow;
-                _jobStore.UpdateJob(job);
-                _logger.LogInformation("Job {id} completed successfully", job.Id);
+                // Simulate random failure
+                var random = new Random();
+                if (random.Next(0, 2) == 0) // 50% chance of failure
+                {
+                    job.Status = "Failed";
+                    job.UpdatedAt = DateTime.UtcNow;
+                    _jobStore.UpdateJob(job);
+
+                    _logger.LogWarning("Job {id} failed", job.Id);
+                }
+                else
+                {
+                    // Mark job as succeeded
+                    job.Status = "Succeeded";
+                    job.UpdatedAt = DateTime.UtcNow;
+                    _jobStore.UpdateJob(job);
+
+                    _logger.LogInformation("Job {id} completed successfully", job.Id);
+                }
             }
 
             _logger.LogInformation("JobWorker heartbeat at: {time}", DateTime.Now);
