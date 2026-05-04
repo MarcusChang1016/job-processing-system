@@ -1,3 +1,5 @@
+using JobProcessing.Api.Models;
+
 namespace JobProcessing.Api.Services;
 
 public class JobWorker : BackgroundService
@@ -21,6 +23,8 @@ public class JobWorker : BackgroundService
 
             if (job != null)
             {
+                var startAt = DateTime.UtcNow;
+
                 _logger.LogInformation("Processing job {id}", job.Id);
 
                 // Simulate job processing
@@ -31,28 +35,51 @@ public class JobWorker : BackgroundService
                 // Simulate processing time
                 await Task.Delay(2000, stoppingToken);
 
-                // Simulate random failure
+                // Simulate random failure / success
                 var random = new Random();
-                if (random.Next(0, 2) == 0) // 50% chance of failure
+                bool isFailed = random.Next(0, 2) == 0; // 50% chance of failure
+
+                JobResult result;
+
+                if (isFailed)
                 {
                     job.Status = "Failed";
                     job.UpdatedAt = DateTime.UtcNow;
                     _jobStore.UpdateJob(job);
 
                     _logger.LogWarning("Job {id} failed", job.Id);
+
+                    result = new JobResult
+                    {
+                        JobId = job.Id,
+                        Success = false,
+                        RetryCount = job.RetryCount,
+                        StartAtUtc = startAt,
+                        FinishedAtUtc = DateTime.UtcNow,
+                        ErrorMessage = "Simulated random failure"
+                    };
+
                 }
                 else
                 {
-                    // Mark job as succeeded
                     job.Status = "Succeeded";
                     job.UpdatedAt = DateTime.UtcNow;
                     _jobStore.UpdateJob(job);
 
                     _logger.LogInformation("Job {id} completed successfully", job.Id);
-                }
-            }
 
-            _logger.LogInformation("JobWorker heartbeat at: {time}", DateTime.Now);
+                    result = new JobResult
+                    {
+                        JobId = job.Id,
+                        Success = true,
+                        RetryCount = job.RetryCount,
+                        StartAtUtc = startAt,
+                        FinishedAtUtc = DateTime.UtcNow
+                    };
+                }
+
+                _logger.LogInformation("Job result: {@JobResult}", result);
+            }
 
             await Task.Delay(3000, stoppingToken);
         }
