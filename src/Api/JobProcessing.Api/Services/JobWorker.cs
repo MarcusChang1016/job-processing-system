@@ -54,7 +54,7 @@ public class JobWorker : BackgroundService
                         JobId = job.Id,
                         Success = true,
                         RetryCount = job.RetryCount,
-                        StartAtUtc = startAt,
+                        StartedAtUtc = startAt,
                         FinishedAtUtc = DateTime.UtcNow
                     };
 
@@ -71,7 +71,7 @@ public class JobWorker : BackgroundService
                         JobId = job.Id,
                         Success = false,
                         RetryCount = job.RetryCount,
-                        StartAtUtc = startAt,
+                        StartedAtUtc = startAt,
                         FinishedAtUtc = DateTime.UtcNow,
                         ErrorMessage = ex.Message
                     };
