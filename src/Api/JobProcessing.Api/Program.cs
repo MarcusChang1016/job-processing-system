@@ -8,6 +8,8 @@ builder.Services.AddControllers();
 
 builder.Services.AddSingleton<JobStore>();
 
+builder.Services.AddHostedService<JobWorker>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
