@@ -26,49 +26,30 @@ public class JobWorker : BackgroundService
             {
                 var startAt = DateTime.UtcNow;
 
-                _logger.LogInformation("Processing job {id}", job.Id);
-
-                // Simulate job processing
-                job.Status = "Processing";
-                job.UpdatedAt = DateTime.UtcNow;
-                _jobStore.UpdateJob(job);
-
-                // Simulate processing time
-                await Task.Delay(2000, stoppingToken);
-
-                // Simulate random failure / success
-                bool isFailed = _random.Next(0, 2) == 0; // 50% chance of failure
-
-                JobResult result;
-
-                if (isFailed)
+                try
                 {
-                    job.Status = "Failed";
+                    _logger.LogInformation("Processing job {id}", job.Id);
+
+                    // Simulate job processing
+                    job.Status = "Processing";
                     job.UpdatedAt = DateTime.UtcNow;
                     _jobStore.UpdateJob(job);
 
-                    _logger.LogWarning("Job {id} failed", job.Id);
+                    // Simulate processing time
+                    await Task.Delay(2000, stoppingToken);
 
-                    result = new JobResult
-                    {
-                        JobId = job.Id,
-                        Success = false,
-                        RetryCount = job.RetryCount,
-                        StartAtUtc = startAt,
-                        FinishedAtUtc = DateTime.UtcNow,
-                        ErrorMessage = "Simulated random failure"
-                    };
+                    // Simulate random failure / success
+                    bool isFailed = _random.Next(0, 2) == 0; // 50% chance of failure
 
-                }
-                else
-                {
+                    if (isFailed) throw new Exception("Simulated failure");
+
                     job.Status = "Succeeded";
                     job.UpdatedAt = DateTime.UtcNow;
                     _jobStore.UpdateJob(job);
 
                     _logger.LogInformation("Job {id} completed successfully", job.Id);
 
-                    result = new JobResult
+                    var result = new JobResult
                     {
                         JobId = job.Id,
                         Success = true,
@@ -76,9 +57,27 @@ public class JobWorker : BackgroundService
                         StartAtUtc = startAt,
                         FinishedAtUtc = DateTime.UtcNow
                     };
-                }
 
-                _logger.LogInformation("Job result: {@JobResult}", result);
+                    _logger.LogInformation("JobResult {@JobResult}", result);
+                }
+                catch (Exception ex)
+                {
+                    job.Status = "Failed";
+                    job.UpdatedAt = DateTime.UtcNow;
+                    _jobStore.UpdateJob(job);
+
+                    var result = new JobResult
+                    {
+                        JobId = job.Id,
+                        Success = false,
+                        RetryCount = job.RetryCount,
+                        StartAtUtc = startAt,
+                        FinishedAtUtc = DateTime.UtcNow,
+                        ErrorMessage = ex.Message
+                    };
+
+                    _logger.LogInformation("Job result: {@JobResult}", result);
+                }
             }
 
             await Task.Delay(3000, stoppingToken);
