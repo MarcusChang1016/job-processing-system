@@ -1,16 +1,18 @@
+using JobProcessing.Api.Infrastructure;
 using JobProcessing.Api.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace JobProcessing.Api.Services;
 
 public class JobWorker : BackgroundService
 {
     private readonly ILogger<JobWorker> _logger;
-    private readonly JobStore _jobStore;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly Random _random = new();
 
-    public JobWorker(JobStore jobStore, ILogger<JobWorker> logger)
+    public JobWorker(IServiceScopeFactory serviceScopeFactory, ILogger<JobWorker> logger)
     {
-        _jobStore = jobStore;
+        _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
     }
 
@@ -20,7 +22,14 @@ public class JobWorker : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            var job = _jobStore.GetPendingJobs().FirstOrDefault();
+            using var scope = _serviceScopeFactory.CreateScope();
+
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var job = await dbContext.Jobs
+                .Where(j => j.Status == "Pending")
+                .OrderBy(j => j.CreatedAtUtc)
+                .FirstOrDefaultAsync(stoppingToken);
+
 
             if (job != null)
             {
@@ -32,8 +41,10 @@ public class JobWorker : BackgroundService
 
                     // Simulate job processing
                     job.Status = "Processing";
-                    job.UpdatedAt = DateTime.UtcNow;
-                    _jobStore.UpdateJob(job);
+                    job.ProcessingStartedAtUtc = DateTime.UtcNow;
+                    job.UpdatedAtUtc = DateTime.UtcNow;
+                    dbContext.Jobs.Update(job);
+                    await dbContext.SaveChangesAsync(stoppingToken);
 
                     // Simulate processing time
                     await Task.Delay(2000, stoppingToken);
@@ -44,8 +55,9 @@ public class JobWorker : BackgroundService
                     if (isFailed) throw new Exception("Simulated failure");
 
                     job.Status = "Succeeded";
-                    job.UpdatedAt = DateTime.UtcNow;
-                    _jobStore.UpdateJob(job);
+                    job.UpdatedAtUtc = DateTime.UtcNow;
+                    job.LastErrorMessage = null;
+                    await dbContext.SaveChangesAsync(stoppingToken);
 
                     _logger.LogInformation("Job {id} completed successfully", job.Id);
 
@@ -63,8 +75,9 @@ public class JobWorker : BackgroundService
                 catch (Exception ex)
                 {
                     job.Status = "Failed";
-                    job.UpdatedAt = DateTime.UtcNow;
-                    _jobStore.UpdateJob(job);
+                    job.UpdatedAtUtc = DateTime.UtcNow;
+                    job.LastErrorMessage = ex.Message;
+                    await dbContext.SaveChangesAsync(stoppingToken);
 
                     var result = new JobResult
                     {

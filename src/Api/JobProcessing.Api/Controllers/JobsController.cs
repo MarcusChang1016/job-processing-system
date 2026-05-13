@@ -1,6 +1,6 @@
+using JobProcessing.Api.Infrastructure;
+using JobProcessing.Api.Infrastructure.Entities;
 using Microsoft.AspNetCore.Mvc;
-using JobProcessing.Api.Models;
-using JobProcessing.Api.Services;
 
 namespace JobProcessing.Api.Controllers;
 
@@ -8,17 +8,17 @@ namespace JobProcessing.Api.Controllers;
 [Route("jobs")]
 public class JobsController : ControllerBase
 {
-    private readonly JobStore _jobStore;
+    private readonly AppDbContext _dbContext;
 
-    public JobsController(JobStore jobStore)
+    public JobsController(AppDbContext dbContext)
     {
-        _jobStore = jobStore;
+        _dbContext = dbContext;
     }
 
     [HttpGet("{id}")]
-    public IActionResult GetJob(Guid id)
+    public async Task<IActionResult> GetJob(Guid id)
     {
-        var job = _jobStore.GetJob(id);
+        var job = await _dbContext.Jobs.FindAsync(id);
 
         if (job == null) return NotFound();
 
@@ -26,37 +26,39 @@ public class JobsController : ControllerBase
         {
             id = job.Id,
             status = job.Status,
-            createdAt = job.CreatedAt,
-            updatedAt = job.UpdatedAt,
+            createdAt = job.CreatedAtUtc,
+            updatedAt = job.UpdatedAtUtc,
             retryCount = job.RetryCount
         });
     }
 
     [HttpPost]
-    public IActionResult CreateJob()
+    public async Task<IActionResult> CreateJob()
     {
-        var job = new Job
+        var job = new JobEntity
         {
             Id = Guid.NewGuid(),
             Status = "Pending",
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
             RetryCount = 0
         };
 
-        _jobStore.AddJob(job);
+        _dbContext.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
 
         return Ok(new
         {
             id = job.Id,
             status = job.Status,
+            retryCount = job.RetryCount
         });
     }
 
     [HttpPost("{id}/retry")]
-    public IActionResult RetryJob(Guid id)
+    public async Task<IActionResult> RetryJob(Guid id)
     {
-        var job = _jobStore.GetJob(id);
+        var job = await _dbContext.Jobs.FindAsync(id);
 
         if (job == null) return NotFound();
 
@@ -64,9 +66,10 @@ public class JobsController : ControllerBase
 
         job.Status = "Pending";
         job.RetryCount += 1;
-        job.UpdatedAt = DateTime.UtcNow;
+        job.UpdatedAtUtc = DateTime.UtcNow;
 
-        _jobStore.UpdateJob(job);
+        _dbContext.Jobs.Update(job);
+        await _dbContext.SaveChangesAsync();
 
         return Ok(new
         {

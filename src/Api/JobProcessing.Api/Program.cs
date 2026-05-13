@@ -1,4 +1,6 @@
 using JobProcessing.Api.Services;
+using JobProcessing.Api.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +14,9 @@ builder.Services.AddHostedService<JobWorker>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite("Data Source=jobs.db"));
 
 var app = builder.Build();
 
