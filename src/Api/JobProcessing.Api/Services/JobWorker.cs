@@ -25,6 +25,29 @@ public class JobWorker : BackgroundService
             using var scope = _serviceScopeFactory.CreateScope();
 
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var timeoutThreshold = DateTime.UtcNow.AddSeconds(-30);
+
+            var stuckJobs = await dbContext.Jobs
+                .Where(j =>
+                    j.Status == "Processing" &&
+                    j.ProcessingStartedAtUtc != null &&
+                    j.ProcessingStartedAtUtc < timeoutThreshold)
+                .ToListAsync(stoppingToken);
+
+            foreach (var stuckJob in stuckJobs)
+            {
+                _logger.LogWarning(
+                    "Recovering stuck job {id}",
+                    stuckJob.Id);
+
+                stuckJob.Status = "Pending";
+                stuckJob.UpdatedAtUtc = DateTime.UtcNow;
+                stuckJob.ProcessingStartedAtUtc = null;
+                stuckJob.LastErrorMessage = "Recovered from stale processing state";
+            }
+            await dbContext.SaveChangesAsync(stoppingToken);
+
             var job = await dbContext.Jobs
                 .Where(j => j.Status == "Pending")
                 .OrderBy(j => j.CreatedAtUtc)
