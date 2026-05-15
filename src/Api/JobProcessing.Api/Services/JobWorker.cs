@@ -68,12 +68,6 @@ public class JobWorker : BackgroundService
 
             if (job != null)
             {
-                if (job.CompletedAtUtc != null)
-                {
-                    _logger.LogWarning("Skipping already completed job {JobId}", job.Id);
-                    continue;
-                }
-
                 var startAt = DateTime.UtcNow;
 
                 try
