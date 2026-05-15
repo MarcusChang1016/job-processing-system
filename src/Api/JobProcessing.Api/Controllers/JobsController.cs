@@ -73,7 +73,7 @@ public class JobsController : ControllerBase
             return BadRequest("Only failed jobs can be retried.");
 
         job.Status = JobStatus.Pending;
-        job.RetryCount += 1;
+        job.RetryCount = 0;
         job.UpdatedAtUtc = DateTime.UtcNow;
         job.NextRetryAtUtc = null;
 
