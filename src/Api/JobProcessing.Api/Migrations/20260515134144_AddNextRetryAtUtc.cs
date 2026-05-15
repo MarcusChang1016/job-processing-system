@@ -15,15 +15,14 @@ namespace JobProcessing.Api.Migrations
                 name: "NextRetryAtUtc",
                 table: "Jobs",
                 type: "TEXT",
-                nullable: true);
+                nullable: true
+            );
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "NextRetryAtUtc",
-                table: "Jobs");
+            migrationBuilder.DropColumn(name: "NextRetryAtUtc", table: "Jobs");
         }
     }
 }

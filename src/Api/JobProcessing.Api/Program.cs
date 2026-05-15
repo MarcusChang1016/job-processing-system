@@ -1,5 +1,5 @@
-using JobProcessing.Api.Services;
 using JobProcessing.Api.Infrastructure;
+using JobProcessing.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,8 +15,9 @@ builder.Services.AddHostedService<JobWorker>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite("Data Source=jobs.db"));
+builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite("Data Source=jobs.db"));
+
+builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
@@ -32,5 +33,6 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHealthChecks("/health");
 
 app.Run();
