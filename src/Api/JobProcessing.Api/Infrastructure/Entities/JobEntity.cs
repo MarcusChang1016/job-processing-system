@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace JobProcessing.Api.Infrastructure.Entities;
 
 public class JobEntity
@@ -16,4 +18,7 @@ public class JobEntity
     public DateTime? ProcessingStartedAtUtc { get; set; }
 
     public string? LastErrorMessage { get; set; }
+
+    [Timestamp]
+    public byte[] RowVersion { get; set; } = default!;
 }

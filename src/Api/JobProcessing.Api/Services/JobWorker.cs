@@ -74,8 +74,17 @@ public class JobWorker : BackgroundService
                     job.Status = "Processing";
                     job.ProcessingStartedAtUtc = DateTime.UtcNow;
                     job.UpdatedAtUtc = DateTime.UtcNow;
-                    dbContext.Jobs.Update(job);
-                    await dbContext.SaveChangesAsync(stoppingToken);
+
+                    try
+                    {
+                        dbContext.Jobs.Update(job);
+                        await dbContext.SaveChangesAsync(stoppingToken);
+                    }
+                    catch (DbUpdateConcurrencyException)
+                    {
+                        _logger.LogWarning("Job {JobId} was claimed by another worker", job.Id);
+                        continue;
+                    }
 
                     // Simulate processing time
                     await Task.Delay(2000, stoppingToken);
@@ -86,7 +95,7 @@ public class JobWorker : BackgroundService
                     if (isFailed)
                         throw new Exception("Simulated failure");
 
-                    job.Status = "Successful";
+                    job.Status = "Success";
                     job.UpdatedAtUtc = DateTime.UtcNow;
                     job.CompletedAtUtc = DateTime.UtcNow;
                     job.LastErrorMessage = null;

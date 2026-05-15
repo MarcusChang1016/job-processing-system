@@ -24,7 +24,7 @@ public class MetricsController : ControllerBase
 
         var failedJobs = await _dbContext.Jobs.CountAsync(job => job.Status == "Failed");
 
-        var successfulJobs = await _dbContext.Jobs.CountAsync(job => job.Status == "Succeeded");
+        var successfulJobs = await _dbContext.Jobs.CountAsync(job => job.Status == "Success");
 
         return Ok(
             new
