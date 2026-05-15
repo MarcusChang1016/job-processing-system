@@ -117,10 +117,21 @@ public class JobWorker : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    job.Status = JobStatus.Failed;
+                    job.RetryCount += 1;
                     job.UpdatedAtUtc = DateTime.UtcNow;
-                    job.NextRetryAtUtc = DateTime.UtcNow.AddSeconds(30); // Set next retry time
                     job.LastErrorMessage = ex.Message;
+
+                    if (job.RetryCount < 3)
+                    {
+                        job.Status = JobStatus.Pending;
+                        job.NextRetryAtUtc = DateTime.UtcNow.AddSeconds(30);
+                    }
+                    else
+                    {
+                        job.Status = JobStatus.Failed;
+                        job.NextRetryAtUtc = null;
+                    }
+
                     await dbContext.SaveChangesAsync(stoppingToken);
 
                     var result = new JobResult
