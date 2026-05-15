@@ -8,6 +8,7 @@ public class JobEntity
 
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
+    public DateTime? CompletedAtUtc { get; set; }
 
     public int RetryCount { get; set; }
 

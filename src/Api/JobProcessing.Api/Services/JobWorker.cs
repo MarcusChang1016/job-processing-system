@@ -29,10 +29,10 @@ public class JobWorker : BackgroundService
             var timeoutThreshold = DateTime.UtcNow.AddSeconds(-30);
 
             var stuckJobs = await dbContext.Jobs
-                .Where(j =>
-                    j.Status == "Processing" &&
-                    j.ProcessingStartedAtUtc != null &&
-                    j.ProcessingStartedAtUtc < timeoutThreshold)
+                .Where(job =>
+                    job.Status == "Processing" &&
+                    job.ProcessingStartedAtUtc != null &&
+                    job.ProcessingStartedAtUtc < timeoutThreshold)
                 .ToListAsync(stoppingToken);
 
             foreach (var stuckJob in stuckJobs)
@@ -49,13 +49,21 @@ public class JobWorker : BackgroundService
             await dbContext.SaveChangesAsync(stoppingToken);
 
             var job = await dbContext.Jobs
-                .Where(j => j.Status == "Pending")
-                .OrderBy(j => j.CreatedAtUtc)
+                .Where(job => job.Status == "Pending")
+                .OrderBy(job => job.CreatedAtUtc)
                 .FirstOrDefaultAsync(stoppingToken);
 
 
             if (job != null)
             {
+                if (job.CompletedAtUtc != null)
+                {
+                    _logger.LogWarning(
+                        "Skipping already completed job {JobId}",
+                        job.Id);
+                    continue;
+                }
+
                 var startAt = DateTime.UtcNow;
 
                 try
@@ -79,6 +87,7 @@ public class JobWorker : BackgroundService
 
                     job.Status = "Succeeded";
                     job.UpdatedAtUtc = DateTime.UtcNow;
+                    job.CompletedAtUtc = DateTime.UtcNow;
                     job.LastErrorMessage = null;
                     await dbContext.SaveChangesAsync(stoppingToken);
 
