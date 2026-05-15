@@ -20,16 +20,19 @@ public class JobsController : ControllerBase
     {
         var job = await _dbContext.Jobs.FindAsync(id);
 
-        if (job == null) return NotFound();
+        if (job == null)
+            return NotFound();
 
-        return Ok(new
-        {
-            id = job.Id,
-            status = job.Status,
-            createdAt = job.CreatedAtUtc,
-            updatedAt = job.UpdatedAtUtc,
-            retryCount = job.RetryCount
-        });
+        return Ok(
+            new
+            {
+                id = job.Id,
+                status = job.Status,
+                createdAt = job.CreatedAtUtc,
+                updatedAt = job.UpdatedAtUtc,
+                retryCount = job.RetryCount,
+            }
+        );
     }
 
     [HttpPost]
@@ -41,18 +44,20 @@ public class JobsController : ControllerBase
             Status = "Pending",
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
-            RetryCount = 0
+            RetryCount = 0,
         };
 
         _dbContext.Jobs.Add(job);
         await _dbContext.SaveChangesAsync();
 
-        return Ok(new
-        {
-            id = job.Id,
-            status = job.Status,
-            retryCount = job.RetryCount
-        });
+        return Ok(
+            new
+            {
+                id = job.Id,
+                status = job.Status,
+                retryCount = job.RetryCount,
+            }
+        );
     }
 
     [HttpPost("{id}/retry")]
@@ -60,22 +65,27 @@ public class JobsController : ControllerBase
     {
         var job = await _dbContext.Jobs.FindAsync(id);
 
-        if (job == null) return NotFound();
+        if (job == null)
+            return NotFound();
 
-        if (job.Status != "Failed") return BadRequest("Only failed jobs can be retried.");
+        if (job.Status != "Failed")
+            return BadRequest("Only failed jobs can be retried.");
 
         job.Status = "Pending";
         job.RetryCount += 1;
         job.UpdatedAtUtc = DateTime.UtcNow;
+        job.NextRetryAtUtc = null;
 
         _dbContext.Jobs.Update(job);
         await _dbContext.SaveChangesAsync();
 
-        return Ok(new
-        {
-            id = job.Id,
-            status = job.Status,
-            retryCount = job.RetryCount
-        });
+        return Ok(
+            new
+            {
+                id = job.Id,
+                status = job.Status,
+                retryCount = job.RetryCount,
+            }
+        );
     }
 }

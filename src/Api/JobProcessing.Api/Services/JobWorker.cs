@@ -28,18 +28,17 @@ public class JobWorker : BackgroundService
 
             var timeoutThreshold = DateTime.UtcNow.AddSeconds(-30);
 
-            var stuckJobs = await dbContext.Jobs
-                .Where(job =>
-                    job.Status == "Processing" &&
-                    job.ProcessingStartedAtUtc != null &&
-                    job.ProcessingStartedAtUtc < timeoutThreshold)
+            var stuckJobs = await dbContext
+                .Jobs.Where(job =>
+                    job.Status == "Processing"
+                    && job.ProcessingStartedAtUtc != null
+                    && job.ProcessingStartedAtUtc < timeoutThreshold
+                )
                 .ToListAsync(stoppingToken);
 
             foreach (var stuckJob in stuckJobs)
             {
-                _logger.LogWarning(
-                    "Recovering stuck job {id}",
-                    stuckJob.Id);
+                _logger.LogWarning("Recovering stuck job {id}", stuckJob.Id);
 
                 stuckJob.Status = "Pending";
                 stuckJob.UpdatedAtUtc = DateTime.UtcNow;
@@ -48,19 +47,20 @@ public class JobWorker : BackgroundService
             }
             await dbContext.SaveChangesAsync(stoppingToken);
 
-            var job = await dbContext.Jobs
-                .Where(job => job.Status == "Pending")
+            var job = await dbContext
+                .Jobs.Where(job =>
+                    job.Status == "Pending"
+                    && (job.NextRetryAtUtc == null || job.NextRetryAtUtc <= DateTime.UtcNow)
+                    && (job.RetryCount < 3)
+                )
                 .OrderBy(job => job.CreatedAtUtc)
                 .FirstOrDefaultAsync(stoppingToken);
-
 
             if (job != null)
             {
                 if (job.CompletedAtUtc != null)
                 {
-                    _logger.LogWarning(
-                        "Skipping already completed job {JobId}",
-                        job.Id);
+                    _logger.LogWarning("Skipping already completed job {JobId}", job.Id);
                     continue;
                 }
 
@@ -83,7 +83,8 @@ public class JobWorker : BackgroundService
                     // Simulate random failure / success
                     bool isFailed = _random.Next(0, 2) == 0; // 50% chance of failure
 
-                    if (isFailed) throw new Exception("Simulated failure");
+                    if (isFailed)
+                        throw new Exception("Simulated failure");
 
                     job.Status = "Succeeded";
                     job.UpdatedAtUtc = DateTime.UtcNow;
@@ -99,7 +100,7 @@ public class JobWorker : BackgroundService
                         Success = true,
                         RetryCount = job.RetryCount,
                         StartedAtUtc = startAt,
-                        FinishedAtUtc = DateTime.UtcNow
+                        FinishedAtUtc = DateTime.UtcNow,
                     };
 
                     _logger.LogInformation("JobResult {@JobResult}", result);
@@ -108,6 +109,7 @@ public class JobWorker : BackgroundService
                 {
                     job.Status = "Failed";
                     job.UpdatedAtUtc = DateTime.UtcNow;
+                    job.NextRetryAtUtc = DateTime.UtcNow.AddSeconds(30); // Set next retry time
                     job.LastErrorMessage = ex.Message;
                     await dbContext.SaveChangesAsync(stoppingToken);
 
@@ -118,7 +120,7 @@ public class JobWorker : BackgroundService
                         RetryCount = job.RetryCount,
                         StartedAtUtc = startAt,
                         FinishedAtUtc = DateTime.UtcNow,
-                        ErrorMessage = ex.Message
+                        ErrorMessage = ex.Message,
                     };
 
                     _logger.LogInformation("Job result: {@JobResult}", result);
@@ -128,5 +130,4 @@ public class JobWorker : BackgroundService
             await Task.Delay(3000, stoppingToken);
         }
     }
-
 }
