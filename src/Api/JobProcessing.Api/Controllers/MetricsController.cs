@@ -1,3 +1,4 @@
+using JobProcessing.Api.Enums;
 using JobProcessing.Api.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -18,13 +19,17 @@ public class MetricsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetMetrics()
     {
-        var pendingJobs = await _dbContext.Jobs.CountAsync(job => job.Status == "Pending");
+        var pendingJobs = await _dbContext.Jobs.CountAsync(job => job.Status == JobStatus.Pending);
 
-        var processingJobs = await _dbContext.Jobs.CountAsync(job => job.Status == "Processing");
+        var processingJobs = await _dbContext.Jobs.CountAsync(job =>
+            job.Status == JobStatus.Processing
+        );
 
-        var failedJobs = await _dbContext.Jobs.CountAsync(job => job.Status == "Failed");
+        var failedJobs = await _dbContext.Jobs.CountAsync(job => job.Status == JobStatus.Failed);
 
-        var successfulJobs = await _dbContext.Jobs.CountAsync(job => job.Status == "Success");
+        var successfulJobs = await _dbContext.Jobs.CountAsync(job =>
+            job.Status == JobStatus.Success
+        );
 
         return Ok(
             new

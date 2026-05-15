@@ -1,3 +1,4 @@
+using JobProcessing.Api.Enums;
 using JobProcessing.Api.Infrastructure;
 using JobProcessing.Api.Models;
 using Microsoft.EntityFrameworkCore;
@@ -30,7 +31,7 @@ public class JobWorker : BackgroundService
 
             var stuckJobs = await dbContext
                 .Jobs.Where(job =>
-                    job.Status == "Processing"
+                    job.Status == JobStatus.Processing
                     && job.ProcessingStartedAtUtc != null
                     && job.ProcessingStartedAtUtc < timeoutThreshold
                 )
@@ -40,7 +41,7 @@ public class JobWorker : BackgroundService
             {
                 _logger.LogWarning("Recovering stuck job {id}", stuckJob.Id);
 
-                stuckJob.Status = "Pending";
+                stuckJob.Status = JobStatus.Pending;
                 stuckJob.UpdatedAtUtc = DateTime.UtcNow;
                 stuckJob.ProcessingStartedAtUtc = null;
                 stuckJob.LastErrorMessage = "Recovered from stale processing state";
@@ -49,7 +50,7 @@ public class JobWorker : BackgroundService
 
             var job = await dbContext
                 .Jobs.Where(job =>
-                    job.Status == "Pending"
+                    job.Status == JobStatus.Pending
                     && (job.NextRetryAtUtc == null || job.NextRetryAtUtc <= DateTime.UtcNow)
                     && (job.RetryCount < 3)
                 )
@@ -71,7 +72,7 @@ public class JobWorker : BackgroundService
                     _logger.LogInformation("Processing job {id}", job.Id);
 
                     // Simulate job processing
-                    job.Status = "Processing";
+                    job.Status = JobStatus.Processing;
                     job.ProcessingStartedAtUtc = DateTime.UtcNow;
                     job.UpdatedAtUtc = DateTime.UtcNow;
 
@@ -95,7 +96,7 @@ public class JobWorker : BackgroundService
                     if (isFailed)
                         throw new Exception("Simulated failure");
 
-                    job.Status = "Success";
+                    job.Status = JobStatus.Success;
                     job.UpdatedAtUtc = DateTime.UtcNow;
                     job.CompletedAtUtc = DateTime.UtcNow;
                     job.LastErrorMessage = null;
@@ -116,7 +117,7 @@ public class JobWorker : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    job.Status = "Failed";
+                    job.Status = JobStatus.Failed;
                     job.UpdatedAtUtc = DateTime.UtcNow;
                     job.NextRetryAtUtc = DateTime.UtcNow.AddSeconds(30); // Set next retry time
                     job.LastErrorMessage = ex.Message;

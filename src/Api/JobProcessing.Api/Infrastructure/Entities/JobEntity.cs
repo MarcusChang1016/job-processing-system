@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using JobProcessing.Api.Enums;
 
 namespace JobProcessing.Api.Infrastructure.Entities;
 
@@ -6,7 +7,7 @@ public class JobEntity
 {
     public Guid Id { get; set; }
 
-    public string Status { get; set; } = null!;
+    public JobStatus Status { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
