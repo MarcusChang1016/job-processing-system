@@ -41,10 +41,19 @@ public class JobWorker : BackgroundService
             {
                 _logger.LogWarning("Recovering stuck job {id}", stuckJob.Id);
 
-                stuckJob.Status = JobStatus.Pending;
+                stuckJob.RetryCount += 1;
                 stuckJob.UpdatedAtUtc = DateTime.UtcNow;
                 stuckJob.ProcessingStartedAtUtc = null;
                 stuckJob.LastErrorMessage = "Recovered from stale processing state";
+
+                if (stuckJob.RetryCount < 3)
+                {
+                    stuckJob.Status = JobStatus.Pending;
+                }
+                else
+                {
+                    stuckJob.Status = JobStatus.Failed;
+                }
             }
             await dbContext.SaveChangesAsync(stoppingToken);
 
