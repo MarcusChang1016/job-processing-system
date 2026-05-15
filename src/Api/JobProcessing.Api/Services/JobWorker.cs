@@ -86,7 +86,7 @@ public class JobWorker : BackgroundService
                     if (isFailed)
                         throw new Exception("Simulated failure");
 
-                    job.Status = "Succeeded";
+                    job.Status = "Successful";
                     job.UpdatedAtUtc = DateTime.UtcNow;
                     job.CompletedAtUtc = DateTime.UtcNow;
                     job.LastErrorMessage = null;

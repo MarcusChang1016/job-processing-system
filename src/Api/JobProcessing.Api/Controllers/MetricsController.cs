@@ -1,3 +1,7 @@
+using JobProcessing.Api.Infrastructure;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
 namespace JobProcessing.Api.Controllers;
 
 [ApiController]
@@ -20,14 +24,13 @@ public class MetricsController : ControllerBase
 
         var failedJobs = await _dbContext.Jobs.CountAsync(job => job.Status == "Failed");
 
-        var successfulJobs = await _dbContext.Jobs.CountAsync(job => job.Status == "Succes");
+        var successfulJobs = await _dbContext.Jobs.CountAsync(job => job.Status == "Succeeded");
 
         return Ok(
             new
             {
                 pendingJobs,
                 processingJobs,
-                completedJobs,
                 failedJobs,
                 successfulJobs,
             }
