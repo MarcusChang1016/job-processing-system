@@ -74,6 +74,18 @@ public class JobWorker : BackgroundService
                 {
                     _logger.LogInformation("Processing job {id}", job.Id);
 
+                    if (!JobStateMachine.CanTransition(job.Status, JobStatus.Processing))
+                    {
+                        _logger.LogWarning(
+                            "Invalid transition {Current} -> {Next} for job {JobId}",
+                            job.Status,
+                            JobStatus.Processing,
+                            job.Id
+                        );
+
+                        continue;
+                    }
+
                     // Simulate job processing
                     job.Status = JobStatus.Processing;
                     job.ProcessingStartedAtUtc = DateTime.UtcNow;
@@ -98,6 +110,18 @@ public class JobWorker : BackgroundService
 
                     if (isFailed)
                         throw new Exception("Simulated failure");
+
+                    if (!JobStateMachine.CanTransition(job.Status, JobStatus.Success))
+                    {
+                        _logger.LogWarning(
+                            "Invalid transition {Current} -> {Next} for job {JobId}",
+                            job.Status,
+                            JobStatus.Success,
+                            job.Id
+                        );
+
+                        continue;
+                    }
 
                     job.Status = JobStatus.Success;
                     job.UpdatedAtUtc = DateTime.UtcNow;
@@ -126,11 +150,35 @@ public class JobWorker : BackgroundService
 
                     if (job.RetryCount < 3)
                     {
+                        if (!JobStateMachine.CanTransition(job.Status, JobStatus.Pending))
+                        {
+                            _logger.LogWarning(
+                                "Invalid transition {Current} -> {Next} for job {JobId}",
+                                job.Status,
+                                JobStatus.Pending,
+                                job.Id
+                            );
+
+                            continue;
+                        }
+
                         job.Status = JobStatus.Pending;
                         job.NextRetryAtUtc = DateTime.UtcNow.AddSeconds(30);
                     }
                     else
                     {
+                        if (!JobStateMachine.CanTransition(job.Status, JobStatus.Failed))
+                        {
+                            _logger.LogWarning(
+                                "Invalid transition {Current} -> {Next} for job {JobId}",
+                                job.Status,
+                                JobStatus.Failed,
+                                job.Id
+                            );
+
+                            continue;
+                        }
+
                         job.Status = JobStatus.Failed;
                         job.NextRetryAtUtc = null;
                     }
