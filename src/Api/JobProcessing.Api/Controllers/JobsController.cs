@@ -1,3 +1,4 @@
+using JobProcessing.Api.Contracts;
 using JobProcessing.Api.Enums;
 using JobProcessing.Api.Infrastructure;
 using JobProcessing.Api.Infrastructure.Entities;
@@ -24,16 +25,7 @@ public class JobsController : ControllerBase
         if (job == null)
             return NotFound();
 
-        return Ok(
-            new
-            {
-                id = job.Id,
-                status = job.Status,
-                createdAt = job.CreatedAtUtc,
-                updatedAt = job.UpdatedAtUtc,
-                retryCount = job.RetryCount,
-            }
-        );
+        return Ok(JobResponse.FromEntity(job));
     }
 
     [HttpPost]
@@ -51,14 +43,7 @@ public class JobsController : ControllerBase
         _dbContext.Jobs.Add(job);
         await _dbContext.SaveChangesAsync();
 
-        return Ok(
-            new
-            {
-                id = job.Id,
-                status = job.Status,
-                retryCount = job.RetryCount,
-            }
-        );
+        return Ok(JobResponse.FromEntity(job));
     }
 
     [HttpPost("{id}/retry")]
@@ -80,13 +65,6 @@ public class JobsController : ControllerBase
         _dbContext.Jobs.Update(job);
         await _dbContext.SaveChangesAsync();
 
-        return Ok(
-            new
-            {
-                id = job.Id,
-                status = job.Status,
-                retryCount = job.RetryCount,
-            }
-        );
+        return Ok(JobResponse.FromEntity(job));
     }
 }

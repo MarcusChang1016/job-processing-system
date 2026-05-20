@@ -1,3 +1,4 @@
+using JobProcessing.Api.Contracts;
 using JobProcessing.Api.Enums;
 using JobProcessing.Api.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
@@ -32,12 +33,12 @@ public class MetricsController : ControllerBase
         );
 
         return Ok(
-            new
+            new MetricsResponse
             {
-                pendingJobs,
-                processingJobs,
-                failedJobs,
-                successfulJobs,
+                PendingJobs = pendingJobs,
+                ProcessingJobs = processingJobs,
+                FailedJobs = failedJobs,
+                SuccessfulJobs = successfulJobs,
             }
         );
     }
