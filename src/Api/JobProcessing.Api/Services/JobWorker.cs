@@ -1,6 +1,5 @@
 using JobProcessing.Api.Enums;
 using JobProcessing.Api.Infrastructure;
-using JobProcessing.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace JobProcessing.Api.Services;
@@ -9,7 +8,6 @@ public class JobWorker : BackgroundService
 {
     private readonly ILogger<JobWorker> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
-    private readonly Random _random = new();
 
     public JobWorker(IServiceScopeFactory serviceScopeFactory, ILogger<JobWorker> logger)
     {
@@ -26,6 +24,7 @@ public class JobWorker : BackgroundService
             using var scope = _serviceScopeFactory.CreateScope();
 
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var executionService = scope.ServiceProvider.GetRequiredService<JobExecutionService>();
 
             var timeoutThreshold = DateTime.UtcNow.AddSeconds(-30);
 
@@ -68,135 +67,37 @@ public class JobWorker : BackgroundService
 
             if (job != null)
             {
-                var startAt = DateTime.UtcNow;
+                _logger.LogInformation("Processing job {id}", job.Id);
+
+                if (!JobStateMachine.CanTransition(job.Status, JobStatus.Processing))
+                {
+                    _logger.LogWarning(
+                        "Invalid transition {Current} -> {Next} for job {JobId}",
+                        job.Status,
+                        JobStatus.Processing,
+                        job.Id
+                    );
+
+                    continue;
+                }
+
+                job.Status = JobStatus.Processing;
+                job.ProcessingStartedAtUtc = DateTime.UtcNow;
+                job.UpdatedAtUtc = DateTime.UtcNow;
 
                 try
                 {
-                    _logger.LogInformation("Processing job {id}", job.Id);
-
-                    if (!JobStateMachine.CanTransition(job.Status, JobStatus.Processing))
-                    {
-                        _logger.LogWarning(
-                            "Invalid transition {Current} -> {Next} for job {JobId}",
-                            job.Status,
-                            JobStatus.Processing,
-                            job.Id
-                        );
-
-                        continue;
-                    }
-
-                    // Simulate job processing
-                    job.Status = JobStatus.Processing;
-                    job.ProcessingStartedAtUtc = DateTime.UtcNow;
-                    job.UpdatedAtUtc = DateTime.UtcNow;
-
-                    try
-                    {
-                        dbContext.Jobs.Update(job);
-                        await dbContext.SaveChangesAsync(stoppingToken);
-                    }
-                    catch (DbUpdateConcurrencyException)
-                    {
-                        _logger.LogWarning("Job {JobId} was claimed by another worker", job.Id);
-                        continue;
-                    }
-
-                    // Simulate processing time
-                    await Task.Delay(2000, stoppingToken);
-
-                    // Simulate random failure / success
-                    bool isFailed = _random.Next(0, 2) == 0; // 50% chance of failure
-
-                    if (isFailed)
-                        throw new Exception("Simulated failure");
-
-                    if (!JobStateMachine.CanTransition(job.Status, JobStatus.Success))
-                    {
-                        _logger.LogWarning(
-                            "Invalid transition {Current} -> {Next} for job {JobId}",
-                            job.Status,
-                            JobStatus.Success,
-                            job.Id
-                        );
-
-                        continue;
-                    }
-
-                    job.Status = JobStatus.Success;
-                    job.UpdatedAtUtc = DateTime.UtcNow;
-                    job.CompletedAtUtc = DateTime.UtcNow;
-                    job.LastErrorMessage = null;
+                    dbContext.Jobs.Update(job);
                     await dbContext.SaveChangesAsync(stoppingToken);
-
-                    _logger.LogInformation("Job {id} completed successfully", job.Id);
-
-                    var result = new JobResult
-                    {
-                        JobId = job.Id,
-                        Success = true,
-                        RetryCount = job.RetryCount,
-                        StartedAtUtc = startAt,
-                        FinishedAtUtc = DateTime.UtcNow,
-                    };
-
-                    _logger.LogInformation("JobResult {@JobResult}", result);
                 }
-                catch (Exception ex)
+                catch (DbUpdateConcurrencyException)
                 {
-                    job.RetryCount += 1;
-                    job.UpdatedAtUtc = DateTime.UtcNow;
-                    job.LastErrorMessage = ex.Message;
-
-                    if (job.RetryCount < 3)
-                    {
-                        if (!JobStateMachine.CanTransition(job.Status, JobStatus.Pending))
-                        {
-                            _logger.LogWarning(
-                                "Invalid transition {Current} -> {Next} for job {JobId}",
-                                job.Status,
-                                JobStatus.Pending,
-                                job.Id
-                            );
-
-                            continue;
-                        }
-
-                        job.Status = JobStatus.Pending;
-                        job.NextRetryAtUtc = DateTime.UtcNow.AddSeconds(30);
-                    }
-                    else
-                    {
-                        if (!JobStateMachine.CanTransition(job.Status, JobStatus.Failed))
-                        {
-                            _logger.LogWarning(
-                                "Invalid transition {Current} -> {Next} for job {JobId}",
-                                job.Status,
-                                JobStatus.Failed,
-                                job.Id
-                            );
-
-                            continue;
-                        }
-
-                        job.Status = JobStatus.Failed;
-                        job.NextRetryAtUtc = null;
-                    }
-
-                    await dbContext.SaveChangesAsync(stoppingToken);
-
-                    var result = new JobResult
-                    {
-                        JobId = job.Id,
-                        Success = false,
-                        RetryCount = job.RetryCount,
-                        StartedAtUtc = startAt,
-                        FinishedAtUtc = DateTime.UtcNow,
-                        ErrorMessage = ex.Message,
-                    };
-
-                    _logger.LogInformation("Job result: {@JobResult}", result);
+                    _logger.LogWarning("Job {JobId} was claimed by another worker", job.Id);
+                    continue;
                 }
+
+                await executionService.ExecuteAsync(job, stoppingToken);
+                await dbContext.SaveChangesAsync(stoppingToken);
             }
 
             await Task.Delay(3000, stoppingToken);
