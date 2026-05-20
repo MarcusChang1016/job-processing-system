@@ -1,4 +1,5 @@
 using JobProcessing.Api.Infrastructure;
+using JobProcessing.Api.Models;
 using JobProcessing.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,6 +13,8 @@ builder.Services.AddSingleton<JobStore>();
 
 builder.Services.AddHostedService<JobWorker>();
 builder.Services.AddScoped<JobExecutionService>();
+
+builder.Services.Configure<WorkerOptions>(builder.Configuration.GetSection("WorkerOptions"));
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -31,6 +34,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

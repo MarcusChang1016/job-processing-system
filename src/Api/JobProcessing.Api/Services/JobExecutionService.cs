@@ -1,17 +1,20 @@
 using JobProcessing.Api.Enums;
 using JobProcessing.Api.Infrastructure.Entities;
 using JobProcessing.Api.Models;
+using Microsoft.Extensions.Options;
 
 namespace JobProcessing.Api.Services;
 
 public class JobExecutionService
 {
     private readonly ILogger<JobExecutionService> _logger;
+    private readonly WorkerOptions _workerOptions;
     private readonly Random _random = new();
 
-    public JobExecutionService(ILogger<JobExecutionService> logger)
+    public JobExecutionService(ILogger<JobExecutionService> logger, IOptions<WorkerOptions> options)
     {
         _logger = logger;
+        _workerOptions = options.Value;
     }
 
     public async Task ExecuteAsync(JobEntity job, CancellationToken stoppingToken)
@@ -23,7 +26,7 @@ public class JobExecutionService
         try
         {
             // Simulate processing time
-            await Task.Delay(2000, stoppingToken);
+            await Task.Delay(_workerOptions.ProcessingDelaySeconds * 1000, stoppingToken);
 
             // Simulate random failure / success
             bool isFailed = _random.Next(0, 2) == 0; // 50% chance of failure
@@ -55,10 +58,12 @@ public class JobExecutionService
             job.UpdatedAtUtc = DateTime.UtcNow;
             job.LastErrorMessage = ex.Message;
 
-            if (job.RetryCount < 3)
+            if (job.RetryCount < _workerOptions.MaxRetryCount)
             {
                 job.Status = JobStatus.Pending;
-                job.NextRetryAtUtc = DateTime.UtcNow.AddSeconds(30);
+                job.NextRetryAtUtc = DateTime.UtcNow.AddSeconds(
+                    _workerOptions.RetryCooldownSeconds
+                );
             }
             else
             {

@@ -1,6 +1,8 @@
 using JobProcessing.Api.Enums;
 using JobProcessing.Api.Infrastructure;
+using JobProcessing.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace JobProcessing.Api.Services;
 
@@ -8,11 +10,17 @@ public class JobWorker : BackgroundService
 {
     private readonly ILogger<JobWorker> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
+    private readonly WorkerOptions _workerOptions;
 
-    public JobWorker(IServiceScopeFactory serviceScopeFactory, ILogger<JobWorker> logger)
+    public JobWorker(
+        IServiceScopeFactory serviceScopeFactory,
+        ILogger<JobWorker> logger,
+        IOptions<WorkerOptions> options
+    )
     {
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
+        _workerOptions = options.Value;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -26,7 +34,9 @@ public class JobWorker : BackgroundService
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var executionService = scope.ServiceProvider.GetRequiredService<JobExecutionService>();
 
-            var timeoutThreshold = DateTime.UtcNow.AddSeconds(-30);
+            var timeoutThreshold = DateTime.UtcNow.AddSeconds(
+                -_workerOptions.StuckJobTimeoutSeconds
+            );
 
             var stuckJobs = await dbContext
                 .Jobs.Where(job =>
@@ -45,7 +55,7 @@ public class JobWorker : BackgroundService
                 stuckJob.ProcessingStartedAtUtc = null;
                 stuckJob.LastErrorMessage = "Recovered from stale processing state";
 
-                if (stuckJob.RetryCount < 3)
+                if (stuckJob.RetryCount < _workerOptions.MaxRetryCount)
                 {
                     stuckJob.Status = JobStatus.Pending;
                 }
@@ -60,7 +70,7 @@ public class JobWorker : BackgroundService
                 .Jobs.Where(job =>
                     job.Status == JobStatus.Pending
                     && (job.NextRetryAtUtc == null || job.NextRetryAtUtc <= DateTime.UtcNow)
-                    && (job.RetryCount < 3)
+                    && (job.RetryCount < _workerOptions.MaxRetryCount)
                 )
                 .OrderBy(job => job.CreatedAtUtc)
                 .FirstOrDefaultAsync(stoppingToken);
@@ -100,7 +110,7 @@ public class JobWorker : BackgroundService
                 await dbContext.SaveChangesAsync(stoppingToken);
             }
 
-            await Task.Delay(3000, stoppingToken);
+            await Task.Delay(_workerOptions.PollingIntervalSeconds * 1000, stoppingToken);
         }
     }
 }
