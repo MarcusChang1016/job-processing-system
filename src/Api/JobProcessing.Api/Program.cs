@@ -11,6 +11,7 @@ builder.Services.AddControllers();
 builder.Services.AddSingleton<JobStore>();
 
 builder.Services.AddHostedService<JobWorker>();
+builder.Services.AddScoped<JobExecutionService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

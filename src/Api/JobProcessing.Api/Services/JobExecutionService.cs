@@ -37,14 +37,17 @@ public class JobExecutionService
             job.LastErrorMessage = null;
 
             _logger.LogInformation("Job {id} completed successfully", job.Id);
-            _logger.LogInformation("JobResult {@JobResult}", new JobResult
-            {
-                JobId = job.Id,
-                Success = true,
-                RetryCount = job.RetryCount,
-                StartedAtUtc = startAt,
-                FinishedAtUtc = DateTime.UtcNow,
-            });
+            _logger.LogInformation(
+                "JobResult {@JobResult}",
+                new JobResult
+                {
+                    JobId = job.Id,
+                    Success = true,
+                    RetryCount = job.RetryCount,
+                    StartedAtUtc = startAt,
+                    FinishedAtUtc = DateTime.UtcNow,
+                }
+            );
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -63,15 +66,18 @@ public class JobExecutionService
                 job.NextRetryAtUtc = null;
             }
 
-            _logger.LogInformation("Job result: {@JobResult}", new JobResult
-            {
-                JobId = job.Id,
-                Success = false,
-                RetryCount = job.RetryCount,
-                StartedAtUtc = startAt,
-                FinishedAtUtc = DateTime.UtcNow,
-                ErrorMessage = ex.Message,
-            });
+            _logger.LogInformation(
+                "Job result: {@JobResult}",
+                new JobResult
+                {
+                    JobId = job.Id,
+                    Success = false,
+                    RetryCount = job.RetryCount,
+                    StartedAtUtc = startAt,
+                    FinishedAtUtc = DateTime.UtcNow,
+                    ErrorMessage = ex.Message,
+                }
+            );
         }
     }
 }
