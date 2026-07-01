@@ -9,8 +9,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
-builder.Services.AddSingleton<JobStore>();
-
 builder.Services.AddHostedService<JobWorker>();
 builder.Services.AddScoped<JobExecutionService>();
 
