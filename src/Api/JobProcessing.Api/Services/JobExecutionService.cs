@@ -9,12 +9,18 @@ public class JobExecutionService
 {
     private readonly ILogger<JobExecutionService> _logger;
     private readonly WorkerOptions _workerOptions;
+    private readonly JobRetryPolicy _jobRetryPolicy;
     private readonly Random _random = new();
 
-    public JobExecutionService(ILogger<JobExecutionService> logger, IOptions<WorkerOptions> options)
+    public JobExecutionService(
+        ILogger<JobExecutionService> logger,
+        IOptions<WorkerOptions> options,
+        JobRetryPolicy jobRetryPolicy
+    )
     {
         _logger = logger;
         _workerOptions = options.Value;
+        _jobRetryPolicy = jobRetryPolicy;
     }
 
     public async Task ExecuteAsync(JobEntity job, CancellationToken stoppingToken)
@@ -54,22 +60,7 @@ public class JobExecutionService
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            job.RetryCount += 1;
-            job.UpdatedAtUtc = DateTime.UtcNow;
-            job.LastErrorMessage = ex.Message;
-
-            if (job.RetryCount < _workerOptions.MaxRetryCount)
-            {
-                job.Status = JobStatus.Pending;
-                job.NextRetryAtUtc = DateTime.UtcNow.AddSeconds(
-                    _workerOptions.RetryCooldownSeconds
-                );
-            }
-            else
-            {
-                job.Status = JobStatus.Failed;
-                job.NextRetryAtUtc = null;
-            }
+            _jobRetryPolicy.ApplyFailure(job, ex.Message, DateTime.UtcNow);
 
             _logger.LogInformation(
                 "Job result: {@JobResult}",

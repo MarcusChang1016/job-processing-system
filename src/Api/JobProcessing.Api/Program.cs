@@ -10,6 +10,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
 builder.Services.AddHostedService<JobWorker>();
+
+builder.Services.AddScoped<JobRetryPolicy>();
 builder.Services.AddScoped<JobExecutionService>();
 
 builder.Services.Configure<WorkerOptions>(builder.Configuration.GetSection("WorkerOptions"));
