@@ -9,18 +9,18 @@ public class JobExecutionService
 {
     private readonly ILogger<JobExecutionService> _logger;
     private readonly WorkerOptions _workerOptions;
-    private readonly JobRetryPolicy _jobRetryPolicy;
+    private readonly JobExecutionResultHandler _jobExecutionResultHandler;
     private readonly Random _random = new();
 
     public JobExecutionService(
         ILogger<JobExecutionService> logger,
         IOptions<WorkerOptions> options,
-        JobRetryPolicy jobRetryPolicy
+        JobExecutionResultHandler jobExecutionResultHandler
     )
     {
         _logger = logger;
         _workerOptions = options.Value;
-        _jobRetryPolicy = jobRetryPolicy;
+        _jobExecutionResultHandler = jobExecutionResultHandler;
     }
 
     public async Task ExecuteAsync(JobEntity job, CancellationToken stoppingToken)
@@ -40,10 +40,7 @@ public class JobExecutionService
             if (isFailed)
                 throw new Exception("Simulated failure");
 
-            job.Status = JobStatus.Success;
-            job.UpdatedAtUtc = DateTime.UtcNow;
-            job.CompletedAtUtc = DateTime.UtcNow;
-            job.LastErrorMessage = null;
+            _jobExecutionResultHandler.ApplySuccess(job, DateTime.UtcNow);
 
             _logger.LogInformation("Job {id} completed successfully", job.Id);
             _logger.LogInformation(
@@ -60,7 +57,7 @@ public class JobExecutionService
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _jobRetryPolicy.ApplyFailure(job, ex.Message, DateTime.UtcNow);
+            _jobExecutionResultHandler.ApplyFailure(job, ex.Message, DateTime.UtcNow);
 
             _logger.LogInformation(
                 "Job result: {@JobResult}",

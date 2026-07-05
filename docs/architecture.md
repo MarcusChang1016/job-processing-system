@@ -126,13 +126,33 @@ Services/JobExecutionService.cs
 
 Responsibilities:
 
+- Orchestrate one job execution attempt
 - Simulate job processing time
 - Simulate success or failure
-- Apply success behaviour
-- Delegate failure retry decisions to `JobRetryPolicy`
+- Delegate success and failure reactions to 'JobExecutionResultHandler'
 - Emit structured job result logs
 
-`JobExecutionService` still owns execution orchestration, simulated randomness, delay, success state updates, and logging. Failure retry behaviour is delegated to `JobRetryPolicy`.
+'JobExecutionService' no longer owns retry decisions or direct success/failure state mutation. It coordinates the execution flow and delegates result handling to 'JobExecutionResultHandler'.
+
+It still owns simulated randomness, delay, logging, and DateTime.UtcNow usage. These are future testability improvement points.
+
+### Job Execution Result Handler
+
+Location:
+
+```text
+Services/JobExecutionResultHandler.cs
+```
+
+Responsibilities:
+
+- Apply success state changes to a job
+- Mark successful jobs as Success
+- Set UpdatedAtUtc and CompletedAtUtc
+- Clear previous failure messages after success
+- Delegate failure handling to JobRetryPolicy
+
+This handler exists so 'JobExecutionService' does not need to know the details of how job state changes after success or failure.
 
 ### Job Retry Policy
 
@@ -152,6 +172,7 @@ Responsibilities:
 - Mark the job as `Failed` when the maximum retry count is reached
 
 This policy is unit tested because retry behaviour is a core business rule.
+`JobRetryPolicy` is used by `JobExecutionResultHandler` when an execution attempt fails.
 
 ### Persistence Layer
 
@@ -304,7 +325,7 @@ The current architecture intentionally keeps some trade-offs visible:
 - API controllers access `AppDbContext` directly
 - API and worker run in the same project and process
 - `JobWorker` contains multiple responsibilities
-- Execution simulation, randomness, delay, success state updates, and logging are still mixed in `JobExecutionService`
+- Execution simulation, randomness, delay, logging, and direct `DateTime.UtcNow` usage are still mixed in `JobExecutionService`
 - Time and randomness are not abstracted, which makes unit testing harder
 - State transitions are not consistently enforced through `JobStateMachine`
 - Test coverage is still early and currently focuses on state transitions, DTO mapping, and retry policy behaviour
@@ -317,9 +338,9 @@ The next architecture improvements should be driven by real learning value and t
 
 Direction:
 
-1. Continue expanding unit tests around retry edge cases and job execution behaviour.
-2. Extract worker sub-responsibilities from `JobWorker`.
-3. Improve testability around time, randomness, and execution simulation.
+1. Continue expanding unit tests around job execution orchestration and worker behaviour.
+2. Improve testability around time, randomness, and execution simulation.
+3. Extract worker sub-responsibilities from `JobWorker`.
 4. Introduce an application layer once controller and worker use cases become clearer.
 5. Split projects only when the boundaries are understood well enough to justify the extra structure.
 
