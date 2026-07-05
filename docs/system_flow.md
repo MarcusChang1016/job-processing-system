@@ -236,7 +236,7 @@ Success
 - The system currently uses polling rather than a message queue.
 - The API and worker currently run in the same process.
 - Job state is persisted in SQLite.
-- Retry behavior is time-based through `NextRetryAtUtc`.
+- Retry behaviour is time-based through `NextRetryAtUtc`.
 - Stuck job recovery protects against jobs remaining in `Processing` forever.
 - The current execution logic is simulated and intentionally simple.
 - State transitions exist in `JobStateMachine`, but not every mutation is enforced through it yet.

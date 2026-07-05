@@ -12,7 +12,7 @@ This project is designed to help me learn, practice, and demonstrate:
 - Background processing with `BackgroundService`
 - Dependency Injection and scoped services
 - EF Core persistence and migrations
-- Retry behavior and failure handling
+- Retry behaviour and failure handling
 - Job state transitions
 - Basic observability with logging, health checks, and metrics
 - Testing, Docker, CI/CD, and cloud deployment in later stages
@@ -56,7 +56,7 @@ Its responsibilities are:
 - Recover stuck processing jobs
 - Claim a job for processing
 - Execute the job
-- Apply retry, cooldown, and failure behavior
+- Apply retry, cooldown, and failure behaviour
 - Persist status changes
 
 ### Persistence
@@ -76,13 +76,15 @@ Persistence responsibilities include:
 
 The system currently includes several reliability concepts:
 
-- Retry policy
+- Retry policy through `JobRetryPolicy`
 - Retry cooldown
 - Maximum retry count
 - Stuck job timeout detection
 - Recovery from stale `Processing` state
-- Fail-fast execution behavior
+- Fail-fast execution behaviour
 - State transition validation
+
+`JobRetryPolicy` owns the decision for what happens after a job execution failure. It decides whether the job should return to `Pending` for retry or move to `Failed` after reaching the maximum retry count.
 
 These are intentionally implemented in a simple form first, so they can be tested and improved later.
 
@@ -126,7 +128,7 @@ Planned next areas:
 - Docker and Docker Compose
 - GitHub Actions CI
 - PostgreSQL
-- JWT authentication and authorization
+- JWT authentication and authorisation
 - OpenTelemetry, Prometheus, and Grafana
 - Cloud deployment
 

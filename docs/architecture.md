@@ -114,7 +114,7 @@ Future improvement candidates:
 - `JobRecoveryService`
 - `JobProcessor`
 - `RetryPolicy`
-- `IClock` for testable time behavior
+- `IClock` for testable time behaviour
 
 ### Job Execution
 
@@ -128,16 +128,30 @@ Responsibilities:
 
 - Simulate job processing time
 - Simulate success or failure
-- Apply success behavior
-- Apply failure behavior
-- Increment retry count
-- Set retry cooldown
-- Mark jobs as permanently failed after max retry count
+- Apply success behaviour
+- Delegate failure retry decisions to `JobRetryPolicy`
 - Emit structured job result logs
 
-This service currently combines execution simulation, retry decisions, status mutation, logging, randomness, and time handling.
+`JobExecutionService` still owns execution orchestration, simulated randomness, delay, success state updates, and logging. Failure retry behaviour is delegated to `JobRetryPolicy`.
 
-That is acceptable for the current stage, but it is also one of the best places to improve testability later.
+### Job Retry Policy
+
+Location:
+
+```text
+Services/JobRetryPolicy.cs
+```
+
+Responsibilities:
+
+- Increment retry count after execution failure
+- Record the failure message
+- Update the job timestamp
+- Decide whether the job should return to `Pending`
+- Set `NextRetryAtUtc` when retry is allowed
+- Mark the job as `Failed` when the maximum retry count is reached
+
+This policy is unit tested because retry behaviour is a core business rule.
 
 ### Persistence Layer
 
@@ -239,7 +253,7 @@ The worker uses polling rather than a message broker. This keeps the system simp
 
 ## Retry and Recovery
 
-The system supports simple retry behavior:
+The system supports simple retry behaviour through `JobRetryPolicy`:
 
 - Failed execution increments `RetryCount`
 - If `RetryCount` is below the configured maximum, the job returns to `Pending`
@@ -290,11 +304,10 @@ The current architecture intentionally keeps some trade-offs visible:
 - API controllers access `AppDbContext` directly
 - API and worker run in the same project and process
 - `JobWorker` contains multiple responsibilities
-- Retry and execution behavior are mixed in `JobExecutionService`
+- Execution simulation, randomness, delay, success state updates, and logging are still mixed in `JobExecutionService`
 - Time and randomness are not abstracted, which makes unit testing harder
 - State transitions are not consistently enforced through `JobStateMachine`
-- Older in-memory prototype code still exists and should be cleaned up
-- There are no automated tests yet
+- Test coverage is still early and currently focuses on state transitions, DTO mapping, and retry policy behaviour
 
 These limitations are not failures. They are useful learning points and provide a clear path for future refactoring.
 
@@ -304,11 +317,10 @@ The next architecture improvements should be driven by real learning value and t
 
 Direction:
 
-1. Add unit tests for state transition and DTO mapping rules.
-2. Clean up legacy in-memory prototype code if it is no longer needed.
-3. Extract retry and execution decisions from `JobExecutionService`.
-4. Extract worker sub-responsibilities from `JobWorker`.
-5. Introduce an application layer once controller and worker use cases become clearer.
-6. Split projects only when the boundaries are understood well enough to justify the extra structure.
+1. Continue expanding unit tests around retry edge cases and job execution behaviour.
+2. Extract worker sub-responsibilities from `JobWorker`.
+3. Improve testability around time, randomness, and execution simulation.
+4. Introduce an application layer once controller and worker use cases become clearer.
+5. Split projects only when the boundaries are understood well enough to justify the extra structure.
 
 The goal is to grow toward cleaner architecture gradually while keeping the system understandable.
