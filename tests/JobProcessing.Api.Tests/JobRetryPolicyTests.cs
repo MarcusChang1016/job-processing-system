@@ -64,4 +64,60 @@ public class JobRetryPolicyTests
         job.LastErrorMessage.Should().Be(errorMessage);
         job.NextRetryAtUtc.Should().BeNull();
     }
+
+    [Fact]
+    public void ApplyFailure_ShouldSetJobToFailed_WhenMaxRetryCountIsOne()
+    {
+        var options = Options.Create(
+            new WorkerOptions { MaxRetryCount = 1, RetryCooldownSeconds = 30 }
+        );
+
+        var policy = new JobRetryPolicy(options);
+
+        var now = new DateTime(2026, 07, 05, 18, 00, 0, 0, DateTimeKind.Utc);
+        var errorMessage = "Simulated failure";
+
+        var job = new JobEntity
+        {
+            Id = Guid.NewGuid(),
+            Status = JobStatus.Processing,
+            RetryCount = 0,
+        };
+
+        policy.ApplyFailure(job, errorMessage, now);
+
+        job.RetryCount.Should().Be(1);
+        job.Status.Should().Be(JobStatus.Failed);
+        job.UpdatedAtUtc.Should().Be(now);
+        job.LastErrorMessage.Should().Be(errorMessage);
+        job.NextRetryAtUtc.Should().BeNull();
+    }
+
+    [Fact]
+    public void ApplyFailure_ShouldSetNextRetryAtUtcToNow_WhenRetryCooldownSecondsIsZero()
+    {
+        var options = Options.Create(
+            new WorkerOptions { MaxRetryCount = 3, RetryCooldownSeconds = 0 }
+        );
+
+        var policy = new JobRetryPolicy(options);
+
+        var now = new DateTime(2026, 07, 05, 18, 00, 0, 0, DateTimeKind.Utc);
+        var errorMessage = "Simulated failure";
+
+        var job = new JobEntity
+        {
+            Id = Guid.NewGuid(),
+            Status = JobStatus.Processing,
+            RetryCount = 0,
+        };
+
+        policy.ApplyFailure(job, errorMessage, now);
+
+        job.RetryCount.Should().Be(1);
+        job.Status.Should().Be(JobStatus.Pending);
+        job.UpdatedAtUtc.Should().Be(now);
+        job.LastErrorMessage.Should().Be(errorMessage);
+        job.NextRetryAtUtc.Should().Be(now);
+    }
 }
