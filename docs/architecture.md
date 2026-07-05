@@ -129,10 +129,10 @@ Responsibilities:
 - Orchestrate one job execution attempt
 - Simulate job processing time
 - Simulate success or failure
-- Delegate success and failure reactions to 'JobExecutionResultHandler'
+- Delegate success and failure reactions to `JobExecutionResultHandler`
 - Emit structured job result logs
 
-'JobExecutionService' no longer owns retry decisions or direct success/failure state mutation. It coordinates the execution flow and delegates result handling to 'JobExecutionResultHandler'.
+`JobExecutionService` no longer owns retry decisions or direct success/failure state mutation. It coordinates the execution flow and delegates result handling to `JobExecutionResultHandler`.
 
 It still owns simulated randomness, delay, logging, and DateTime.UtcNow usage. These are future testability improvement points.
 
@@ -147,12 +147,12 @@ Services/JobExecutionResultHandler.cs
 Responsibilities:
 
 - Apply success state changes to a job
-- Mark successful jobs as Success
+- Mark successful jobs as `Success`
 - Set UpdatedAtUtc and CompletedAtUtc
 - Clear previous failure messages after success
 - Delegate failure handling to JobRetryPolicy
 
-This handler exists so 'JobExecutionService' does not need to know the details of how job state changes after success or failure.
+This handler exists so `JobExecutionService` does not need to know the details of how job state changes after success or failure.
 
 ### Job Retry Policy
 
