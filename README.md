@@ -29,6 +29,8 @@ Client
   -> EF Core / SQLite
   -> BackgroundService worker
   -> JobExecutionService
+  -> JobExecutionResultHandler
+  -> JobRetryPolicy when failure occurs
   -> update job status in database
 ```
 
@@ -55,8 +57,7 @@ Its responsibilities are:
 - Poll for pending jobs
 - Recover stuck processing jobs
 - Claim a job for processing
-- Execute the job
-- Apply retry, cooldown, and failure behaviour
+- Delegate execution to `JobExecutionService`
 - Persist status changes
 
 ### Persistence
@@ -83,6 +84,8 @@ The system currently includes several reliability concepts:
 - Recovery from stale `Processing` state
 - Fail-fast execution behaviour
 - State transition validation
+- Execution result handling through `JobExecutionResultHandler`
+- Execution timestamps through `TimeProvider`
 
 `JobRetryPolicy` owns the decision for what happens after a job execution failure. It decides whether the job should return to `Pending` for retry or move to `Failed` after reaching the maximum retry count.
 
@@ -113,6 +116,9 @@ Failed
 - Swagger / OpenAPI
 - Health Checks
 - Structured logging
+- xUnit
+- FluentAssertions
+- TimeProvider
 
 ## Learning Roadmap
 
@@ -120,9 +126,8 @@ The project will continue to grow in stages.
 
 Planned next areas:
 
-- xUnit unit tests
+- Broader unit test coverage
 - Integration tests
-- FluentAssertions
 - Testcontainers
 - Better separation between API, application logic, infrastructure, and worker concerns
 - Docker and Docker Compose
@@ -139,8 +144,7 @@ This project is still evolving. Some known limitations are:
 - API controllers currently access `AppDbContext` directly.
 - API and worker currently run in the same project and process.
 - `JobWorker` contains several responsibilities that may later be extracted.
-- Some older in-memory prototype code still exists and needs cleanup.
-- Test coverage has not been added yet.
+- Test coverage is still early and currently focuses on state transitions, DTO mapping, retry policy, and execution result handling.
 - Docker, CI/CD, authentication, and production observability are not implemented yet.
 
 These limitations are intentional learning opportunities and will guide future refactoring.

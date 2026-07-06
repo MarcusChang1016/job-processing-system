@@ -7,14 +7,16 @@ This document describes how a job moves through the system from creation to comp
 ```text
 Client
   -> POST /jobs
-  -> API creates a Pending job
+  -> API creates a `Pending` job
   -> EF Core saves the job to SQLite
 
 Background worker
-  -> polls for eligible Pending jobs
-  -> marks one job as Processing
-  -> executes the job
-  -> marks it as Success, Pending, or Failed
+  -> polls for eligible `Pending` jobs
+  -> marks one job as `Processing`
+  -> calls `JobExecutionService`
+  -> `JobExecutionService` simulates execution
+  -> `JobExecutionResultHandler` applies success or failure state changes
+  -> `JobRetryPolicy` decides retry behaviour when execution fails
   -> EF Core saves the final state
 ```
 
@@ -110,11 +112,13 @@ The current implementation simulates work by:
 - waiting for a configured delay
 - randomly succeeding or failing
 
+`JobExecutionService` orchestrates the execution attempt. It uses `TimeProvider` for execution timestamps and delegates state changes to `JobExecutionResultHandler`.
+
 This keeps the project focused on the job processing lifecycle before introducing real job handlers.
 
 ## 6. Successful Execution
 
-When execution succeeds, the job is updated:
+When execution succeeds, `JobExecutionResultHandler` applies the success state:
 
 ```text
 Status = Success
@@ -127,7 +131,7 @@ The result is also written through structured logging.
 
 ## 7. Failed Execution and Retry
 
-When execution fails, the job is updated:
+When execution fails, `JobExecutionResultHandler` delegates failure handling to `JobRetryPolicy`.
 
 ```text
 RetryCount += 1
@@ -239,4 +243,7 @@ Success
 - Retry behaviour is time-based through `NextRetryAtUtc`.
 - Stuck job recovery protects against jobs remaining in `Processing` forever.
 - The current execution logic is simulated and intentionally simple.
+- `JobExecutionService` uses `TimeProvider` for execution timestamps.
+- Success and failure reactions are handled by `JobExecutionResultHandler`.
+- Retry decisions are handled by `JobRetryPolicy`.
 - State transitions exist in `JobStateMachine`, but not every mutation is enforced through it yet.
