@@ -114,7 +114,7 @@ Future improvement candidates:
 - `JobRecoveryService`
 - `JobProcessor`
 - `RetryPolicy`
-- `IClock` for testable time behaviour
+- Time abstraction for worker recovery and polling logic
 
 ### Job Execution
 
@@ -134,7 +134,7 @@ Responsibilities:
 
 `JobExecutionService` no longer owns retry decisions or direct success/failure state mutation. It coordinates the execution flow and delegates result handling to `JobExecutionResultHandler`.
 
-It still owns simulated randomness, delay, logging, and DateTime.UtcNow usage. These are future testability improvement points.
+It still owns simulated randomness, delay, logging, and `TimeProvider` usage. These are future testability improvement points.
 
 ### Job Execution Result Handler
 
@@ -148,9 +148,9 @@ Responsibilities:
 
 - Apply success state changes to a job
 - Mark successful jobs as `Success`
-- Set UpdatedAtUtc and CompletedAtUtc
+- Set `UpdatedAtUtc` and `CompletedAtUtc`
 - Clear previous failure messages after success
-- Delegate failure handling to JobRetryPolicy
+- Delegate failure handling to `JobRetryPolicy`
 
 This handler exists so `JobExecutionService` does not need to know the details of how job state changes after success or failure.
 
@@ -325,8 +325,7 @@ The current architecture intentionally keeps some trade-offs visible:
 - API controllers access `AppDbContext` directly
 - API and worker run in the same project and process
 - `JobWorker` contains multiple responsibilities
-- Execution simulation, randomness, delay, logging, and direct `DateTime.UtcNow` usage are still mixed in `JobExecutionService`
-- Time and randomness are not abstracted, which makes unit testing harder
+- `JobExecutionService` uses `TimeProvider` for execution timestamps, but randomness and delay are still not abstracted
 - State transitions are not consistently enforced through `JobStateMachine`
 - Test coverage is still early and currently focuses on state transitions, DTO mapping, and retry policy behaviour
 

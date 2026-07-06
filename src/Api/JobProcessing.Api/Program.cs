@@ -11,6 +11,8 @@ builder.Services.AddControllers();
 
 builder.Services.AddHostedService<JobWorker>();
 
+builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+
 builder.Services.AddScoped<JobRetryPolicy>();
 builder.Services.AddScoped<JobExecutionResultHandler>();
 builder.Services.AddScoped<JobExecutionService>();
