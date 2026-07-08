@@ -14,11 +14,12 @@ public class JobRetryPolicy
         _workerOptions = options.Value;
     }
 
-    public void ApplyFailure(JobEntity job, string errorMessage, DateTime now)
+    public void ApplyFailedAttempt(JobEntity job, string errorMessage, DateTime now)
     {
         job.RetryCount += 1;
         job.UpdatedAtUtc = now;
         job.LastErrorMessage = errorMessage;
+        job.ProcessingStartedAtUtc = null;
 
         if (job.RetryCount < _workerOptions.MaxRetryCount)
         {

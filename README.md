@@ -28,9 +28,10 @@ Client
   -> ASP.NET Core API
   -> EF Core / SQLite
   -> BackgroundService worker
+  -> JobRecoveryService for stale Processing jobs
   -> JobExecutionService
   -> JobExecutionResultHandler
-  -> JobRetryPolicy when failure occurs
+  -> JobRetryPolicy for failed attempts
   -> update job status in database
 ```
 
@@ -55,7 +56,7 @@ The worker runs continuously in the background using `BackgroundService`.
 Its responsibilities are:
 
 - Poll for pending jobs
-- Recover stuck processing jobs
+- Delegate stuck processing job recovery to `JobRecoveryService`
 - Claim a job for processing
 - Delegate execution to `JobExecutionService`
 - Persist status changes
@@ -87,7 +88,7 @@ The system currently includes several reliability concepts:
 - Execution result handling through `JobExecutionResultHandler`
 - Execution timestamps through `TimeProvider`
 
-`JobRetryPolicy` owns the decision for what happens after a job execution failure. It decides whether the job should return to `Pending` for retry or move to `Failed` after reaching the maximum retry count.
+`JobRetryPolicy` owns the decision for what happens after a failed job attempt. A failed attempt can come from execution failure or stuck job recovery. It decides whether the job should return to `Pending` with retry cooldown or move to `Failed` after reaching the maximum retry count.
 
 These are intentionally implemented in a simple form first, so they can be tested and improved later.
 
@@ -143,8 +144,8 @@ This project is still evolving. Some known limitations are:
 
 - API controllers currently access `AppDbContext` directly.
 - API and worker currently run in the same project and process.
-- `JobWorker` contains several responsibilities that may later be extracted.
-- Test coverage is still early and currently focuses on state transitions, DTO mapping, retry policy, and execution result handling.
+- `JobWorker` still contains job claiming and execution orchestration responsibilities; stuck job recovery has been extracted into `JobRecoveryService`.
+- Test coverage is still early and currently focuses on state transitions, DTO mapping, retry policy, execution result handling, and stuck job recovery.
 - Docker, CI/CD, authentication, and production observability are not implemented yet.
 
 These limitations are intentional learning opportunities and will guide future refactoring.

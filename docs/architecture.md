@@ -13,7 +13,10 @@ Client
   -> ASP.NET Core API
   -> EF Core / SQLite
   -> BackgroundService worker
+  -> JobRecoveryService
   -> JobExecutionService
+  -> JobExecutionResultHandler
+  -> JobRetryPolicy
   -> EF Core / SQLite
 ```
 
@@ -96,8 +99,7 @@ Responsibilities:
 
 - Run continuously using `BackgroundService`
 - Create a scoped service provider for each polling cycle
-- Query stuck `Processing` jobs
-- Recover or fail stale jobs
+- Call `JobRecoveryService` to recover stale `Processing` jobs
 - Query the next available `Pending` job
 - Mark a job as `Processing`
 - Save the claim attempt
@@ -111,10 +113,24 @@ The worker currently contains several responsibilities in one class. This keeps 
 Future improvement candidates:
 
 - `JobClaimService`
-- `JobRecoveryService`
 - `JobProcessor`
-- `RetryPolicy`
-- Time abstraction for worker recovery and polling logic
+- Time abstraction is now used through `TimeProvider`; remaining improvement is to move claim timing into a future `JobClaimService`
+
+### Job Recovery
+
+Location:
+
+Services/JobRecoveryService.cs
+
+Responsibilities:
+
+- Find stale `Processing` jobs
+- Treat recovered stale jobs as failed attempts
+- Delegate retry/failure state changes to `JobRetryPolicy`
+- Persist recovered job state
+- Return the number of recovered jobs
+
+`JobRecoveryService` keeps recovery logic out of `JobWorker`. This makes the worker thinner and allows recovery behaviour to be tested without testing the full background loop.
 
 ### Job Execution
 
@@ -164,15 +180,16 @@ Services/JobRetryPolicy.cs
 
 Responsibilities:
 
-- Increment retry count after execution failure
-- Record the failure message
+- Increment retry count after a failed attempt
+- Record the failure or recovery message
+- Clear `ProcessingStartedAtUtc`
 - Update the job timestamp
 - Decide whether the job should return to `Pending`
 - Set `NextRetryAtUtc` when retry is allowed
 - Mark the job as `Failed` when the maximum retry count is reached
 
 This policy is unit tested because retry behaviour is a core business rule.
-`JobRetryPolicy` is used by `JobExecutionResultHandler` when an execution attempt fails.
+`JobRetryPolicy` is used by `JobExecutionResultHandler` when execution fails and by `JobRecoveryService` when a stale processing job is recovered.
 
 ### Persistence Layer
 
@@ -261,7 +278,7 @@ Client
   -> Save to database
 
 Worker polling loop
-  -> Recover stale Processing jobs
+  -> `JobRecoveryService` recovers stale Processing jobs through `JobRetryPolicy`
   -> Find oldest eligible Pending job
   -> Mark as Processing
   -> Save changes
@@ -276,7 +293,7 @@ The worker uses polling rather than a message broker. This keeps the system simp
 
 The system supports simple retry behaviour through `JobRetryPolicy`:
 
-- Failed execution increments `RetryCount`
+- A failed attempt increments `RetryCount`
 - If `RetryCount` is below the configured maximum, the job returns to `Pending`
 - `NextRetryAtUtc` controls retry cooldown
 - If the maximum retry count is reached, the job becomes `Failed`
@@ -286,6 +303,8 @@ The system also supports stuck job recovery:
 - Jobs left in `Processing` beyond a configured timeout are considered stale
 - Stale jobs are either returned to `Pending` or marked as `Failed`
 - This protects the system from jobs being stuck forever after a worker crash or interrupted execution
+
+Stuck job recovery now uses the same retry policy as execution failure.
 
 ## Concurrency
 
@@ -324,7 +343,7 @@ The current architecture intentionally keeps some trade-offs visible:
 
 - API controllers access `AppDbContext` directly
 - API and worker run in the same project and process
-- `JobWorker` contains multiple responsibilities
+- `JobWorker` still contains job claiming and execution orchestration responsibilities; stuck job recovery has been extracted into `JobRecoveryService`.
 - `JobExecutionService` uses `TimeProvider` for execution timestamps, but randomness and delay are still not abstracted
 - State transitions are not consistently enforced through `JobStateMachine`
 - Test coverage is still early and currently focuses on state transitions, DTO mapping, and retry policy behaviour
@@ -339,7 +358,7 @@ Direction:
 
 1. Continue expanding unit tests around job execution orchestration and worker behaviour.
 2. Improve testability around time, randomness, and execution simulation.
-3. Extract worker sub-responsibilities from `JobWorker`.
+3. Continue extracting worker sub-responsibilities from `JobWorker`, especially job claiming.
 4. Introduce an application layer once controller and worker use cases become clearer.
 5. Split projects only when the boundaries are understood well enough to justify the extra structure.
 

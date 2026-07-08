@@ -16,6 +16,7 @@ builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 builder.Services.AddScoped<JobRetryPolicy>();
 builder.Services.AddScoped<JobExecutionResultHandler>();
 builder.Services.AddScoped<JobExecutionService>();
+builder.Services.AddScoped<JobRecoveryService>();
 
 builder.Services.Configure<WorkerOptions>(builder.Configuration.GetSection("WorkerOptions"));
 

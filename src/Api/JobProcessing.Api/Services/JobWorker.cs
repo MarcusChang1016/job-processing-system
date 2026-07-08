@@ -11,65 +11,43 @@ public class JobWorker : BackgroundService
     private readonly ILogger<JobWorker> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly WorkerOptions _workerOptions;
+    private readonly TimeProvider _timeProvider;
 
     public JobWorker(
         IServiceScopeFactory serviceScopeFactory,
         ILogger<JobWorker> logger,
-        IOptions<WorkerOptions> options
+        IOptions<WorkerOptions> options,
+        TimeProvider timeProvider
     )
     {
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
         _workerOptions = options.Value;
+        _timeProvider = timeProvider;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("JobWorker started at: {time}", DateTime.Now);
+        var startedAt = _timeProvider.GetUtcNow().UtcDateTime;
+
+        _logger.LogInformation("JobWorker started at: {time}", startedAt);
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            var cycleNow = _timeProvider.GetUtcNow().UtcDateTime;
+
             using var scope = _serviceScopeFactory.CreateScope();
 
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var executionService = scope.ServiceProvider.GetRequiredService<JobExecutionService>();
+            var recoveryService = scope.ServiceProvider.GetRequiredService<JobRecoveryService>();
 
-            var timeoutThreshold = DateTime.UtcNow.AddSeconds(
-                -_workerOptions.StuckJobTimeoutSeconds
-            );
-
-            var stuckJobs = await dbContext
-                .Jobs.Where(job =>
-                    job.Status == JobStatus.Processing
-                    && job.ProcessingStartedAtUtc != null
-                    && job.ProcessingStartedAtUtc < timeoutThreshold
-                )
-                .ToListAsync(stoppingToken);
-
-            foreach (var stuckJob in stuckJobs)
-            {
-                _logger.LogWarning("Recovering stuck job {id}", stuckJob.Id);
-
-                stuckJob.RetryCount += 1;
-                stuckJob.UpdatedAtUtc = DateTime.UtcNow;
-                stuckJob.ProcessingStartedAtUtc = null;
-                stuckJob.LastErrorMessage = "Recovered from stale processing state";
-
-                if (stuckJob.RetryCount < _workerOptions.MaxRetryCount)
-                {
-                    stuckJob.Status = JobStatus.Pending;
-                }
-                else
-                {
-                    stuckJob.Status = JobStatus.Failed;
-                }
-            }
-            await dbContext.SaveChangesAsync(stoppingToken);
+            await recoveryService.RecoverStuckJobsAsync(stoppingToken);
 
             var job = await dbContext
                 .Jobs.Where(job =>
                     job.Status == JobStatus.Pending
-                    && (job.NextRetryAtUtc == null || job.NextRetryAtUtc <= DateTime.UtcNow)
+                    && (job.NextRetryAtUtc == null || job.NextRetryAtUtc <= cycleNow)
                     && (job.RetryCount < _workerOptions.MaxRetryCount)
                 )
                 .OrderBy(job => job.CreatedAtUtc)
@@ -92,8 +70,8 @@ public class JobWorker : BackgroundService
                 }
 
                 job.Status = JobStatus.Processing;
-                job.ProcessingStartedAtUtc = DateTime.UtcNow;
-                job.UpdatedAtUtc = DateTime.UtcNow;
+                job.ProcessingStartedAtUtc = cycleNow;
+                job.UpdatedAtUtc = cycleNow;
 
                 try
                 {

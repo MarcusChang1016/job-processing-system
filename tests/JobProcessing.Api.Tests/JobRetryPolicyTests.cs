@@ -10,7 +10,7 @@ namespace JobProcessing.Api.Tests;
 public class JobRetryPolicyTests
 {
     [Fact]
-    public void ApplyFailure_ShouldSetJobToPending_WhenRetryCountIsBelowMaxRetryCount()
+    public void ApplyFailedAttempt_ShouldSetJobToPending_WhenRetryCountIsBelowMaxRetryCount()
     {
         var options = Options.Create(
             new WorkerOptions { MaxRetryCount = 3, RetryCooldownSeconds = 30 }
@@ -26,19 +26,21 @@ public class JobRetryPolicyTests
             Id = Guid.NewGuid(),
             Status = JobStatus.Processing,
             RetryCount = 0,
+            ProcessingStartedAtUtc = now.AddMinutes(5),
         };
 
-        policy.ApplyFailure(job, errorMessage, now);
+        policy.ApplyFailedAttempt(job, errorMessage, now);
 
         job.RetryCount.Should().Be(1);
         job.Status.Should().Be(JobStatus.Pending);
         job.UpdatedAtUtc.Should().Be(now);
         job.LastErrorMessage.Should().Be(errorMessage);
         job.NextRetryAtUtc.Should().Be(now.AddSeconds(30));
+        job.ProcessingStartedAtUtc.Should().BeNull();
     }
 
     [Fact]
-    public void ApplyFailure_ShouldSetJobToFailed_WhenRetryCountReachesMaxRetryCount()
+    public void ApplyFailedAttempt_ShouldSetJobToFailed_WhenRetryCountReachesMaxRetryCount()
     {
         var options = Options.Create(
             new WorkerOptions { MaxRetryCount = 3, RetryCooldownSeconds = 30 }
@@ -54,19 +56,21 @@ public class JobRetryPolicyTests
             Id = Guid.NewGuid(),
             Status = JobStatus.Processing,
             RetryCount = 2,
+            ProcessingStartedAtUtc = now.AddMinutes(5),
         };
 
-        policy.ApplyFailure(job, errorMessage, now);
+        policy.ApplyFailedAttempt(job, errorMessage, now);
 
         job.RetryCount.Should().Be(3);
         job.Status.Should().Be(JobStatus.Failed);
         job.UpdatedAtUtc.Should().Be(now);
         job.LastErrorMessage.Should().Be(errorMessage);
         job.NextRetryAtUtc.Should().BeNull();
+        job.ProcessingStartedAtUtc.Should().BeNull();
     }
 
     [Fact]
-    public void ApplyFailure_ShouldSetJobToFailed_WhenMaxRetryCountIsOne()
+    public void ApplyFailedAttempt_ShouldSetJobToFailed_WhenMaxRetryCountIsOne()
     {
         var options = Options.Create(
             new WorkerOptions { MaxRetryCount = 1, RetryCooldownSeconds = 30 }
@@ -82,19 +86,21 @@ public class JobRetryPolicyTests
             Id = Guid.NewGuid(),
             Status = JobStatus.Processing,
             RetryCount = 0,
+            ProcessingStartedAtUtc = now.AddMinutes(5),
         };
 
-        policy.ApplyFailure(job, errorMessage, now);
+        policy.ApplyFailedAttempt(job, errorMessage, now);
 
         job.RetryCount.Should().Be(1);
         job.Status.Should().Be(JobStatus.Failed);
         job.UpdatedAtUtc.Should().Be(now);
         job.LastErrorMessage.Should().Be(errorMessage);
         job.NextRetryAtUtc.Should().BeNull();
+        job.ProcessingStartedAtUtc.Should().BeNull();
     }
 
     [Fact]
-    public void ApplyFailure_ShouldSetNextRetryAtUtcToNow_WhenRetryCooldownSecondsIsZero()
+    public void ApplyFailedAttempt_ShouldSetNextRetryAtUtcToNow_WhenRetryCooldownSecondsIsZero()
     {
         var options = Options.Create(
             new WorkerOptions { MaxRetryCount = 3, RetryCooldownSeconds = 0 }
@@ -110,14 +116,16 @@ public class JobRetryPolicyTests
             Id = Guid.NewGuid(),
             Status = JobStatus.Processing,
             RetryCount = 0,
+            ProcessingStartedAtUtc = now.AddMinutes(5),
         };
 
-        policy.ApplyFailure(job, errorMessage, now);
+        policy.ApplyFailedAttempt(job, errorMessage, now);
 
         job.RetryCount.Should().Be(1);
         job.Status.Should().Be(JobStatus.Pending);
         job.UpdatedAtUtc.Should().Be(now);
         job.LastErrorMessage.Should().Be(errorMessage);
         job.NextRetryAtUtc.Should().Be(now);
+        job.ProcessingStartedAtUtc.Should().BeNull();
     }
 }

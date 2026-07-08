@@ -28,6 +28,7 @@ public class JobExecutionResultHandlerTests
             Status = JobStatus.Processing,
             LastErrorMessage = "Previous failure",
             RetryCount = 0,
+            ProcessingStartedAtUtc = now.AddMinutes(5),
         };
 
         resultHandler.ApplySuccess(job, now);
@@ -36,6 +37,8 @@ public class JobExecutionResultHandlerTests
         job.UpdatedAtUtc.Should().Be(now);
         job.CompletedAtUtc.Should().Be(now);
         job.LastErrorMessage.Should().BeNull();
+        job.NextRetryAtUtc.Should().BeNull();
+        job.ProcessingStartedAtUtc.Should().BeNull();
     }
 
     [Fact]
@@ -57,6 +60,7 @@ public class JobExecutionResultHandlerTests
             Id = Guid.NewGuid(),
             Status = JobStatus.Processing,
             RetryCount = 0,
+            ProcessingStartedAtUtc = now.AddMinutes(5),
         };
 
         resultHandler.ApplyFailure(job, errorMessage, now);
@@ -66,6 +70,7 @@ public class JobExecutionResultHandlerTests
         job.UpdatedAtUtc.Should().Be(now);
         job.LastErrorMessage.Should().Be(errorMessage);
         job.NextRetryAtUtc.Should().BeNull();
+        job.ProcessingStartedAtUtc.Should().BeNull();
         job.CompletedAtUtc.Should().BeNull();
     }
 }

@@ -18,10 +18,12 @@ public class JobExecutionResultHandler
         job.UpdatedAtUtc = now;
         job.CompletedAtUtc = now;
         job.LastErrorMessage = null;
+        job.NextRetryAtUtc = null;
+        job.ProcessingStartedAtUtc = null;
     }
 
     public void ApplyFailure(JobEntity job, string errorMessage, DateTime now)
     {
-        _jobRetryPolicy.ApplyFailure(job, errorMessage, now);
+        _jobRetryPolicy.ApplyFailedAttempt(job, errorMessage, now);
     }
 }

@@ -11,12 +11,13 @@ Client
   -> EF Core saves the job to SQLite
 
 Background worker
+  -> calls `JobRecoveryService` to recover stale `Processing` jobs
   -> polls for eligible `Pending` jobs
   -> marks one job as `Processing`
   -> calls `JobExecutionService`
   -> `JobExecutionService` simulates execution
   -> `JobExecutionResultHandler` applies success or failure state changes
-  -> `JobRetryPolicy` decides retry behaviour when execution fails
+  -> `JobRetryPolicy` decides retry behaviour for failed attempts
   -> EF Core saves the final state
 ```
 
@@ -49,7 +50,7 @@ On each polling cycle, the worker:
 1. Creates a scoped service provider.
 2. Resolves `AppDbContext`.
 3. Resolves `JobExecutionService`.
-4. Checks for stuck `Processing` jobs.
+4. Calls `JobRecoveryService` to recover stuck `Processing` jobs.
 5. Looks for the oldest eligible `Pending` job.
 
 A pending job is eligible when:
@@ -60,7 +61,7 @@ A pending job is eligible when:
 
 ## 3. Stuck Job Recovery
 
-Before picking a new pending job, the worker checks for jobs stuck in `Processing`.
+When a stuck job is found, `JobRecoveryService` treats it as a failed attempt and delegates retry behaviour to `JobRetryPolicy`.
 
 A job is considered stuck when:
 
@@ -74,15 +75,18 @@ When a stuck job is found, the worker:
 - updates `UpdatedAtUtc`
 - clears `ProcessingStartedAtUtc`
 - stores a recovery error message
+- applies retry cooldown through `NextRetryAtUtc` when retry is allowed
 
-Then the worker decides:
+Then `JobRetryPolicy` decides:
 
 ```text
 RetryCount < MaxRetryCount
   -> Status = Pending
+  -> NextRetryAtUtc = now + RetryCooldownSeconds
 
 RetryCount >= MaxRetryCount
   -> Status = Failed
+  -> NextRetryAtUtc = null
 ```
 
 This prevents jobs from staying in `Processing` forever after a crash, cancellation, or interrupted execution.
@@ -125,6 +129,8 @@ Status = Success
 CompletedAtUtc = now
 UpdatedAtUtc = now
 LastErrorMessage = null
+NextRetryAtUtc = null
+ProcessingStartedAtUtc = null
 ```
 
 The result is also written through structured logging.
@@ -137,6 +143,7 @@ When execution fails, `JobExecutionResultHandler` delegates failure handling to 
 RetryCount += 1
 UpdatedAtUtc = now
 LastErrorMessage = error message
+ProcessingStartedAtUtc = null
 ```
 
 Then retry rules are applied.
