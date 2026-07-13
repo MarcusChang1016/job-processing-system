@@ -29,6 +29,7 @@ Client
   -> EF Core / SQLite
   -> BackgroundService worker
   -> JobRecoveryService for stale Processing jobs
+  -> JobClaimService for eligible Pending jobs
   -> JobExecutionService
   -> JobExecutionResultHandler
   -> JobRetryPolicy for failed attempts
@@ -55,11 +56,12 @@ The worker runs continuously in the background using `BackgroundService`.
 
 Its responsibilities are:
 
-- Poll for pending jobs
+- Run the polling loop
+- Create scoped services per polling cycle
 - Delegate stuck processing job recovery to `JobRecoveryService`
-- Claim a job for processing
+- Delegate eligible pending job claiming to `JobClaimService`
 - Delegate execution to `JobExecutionService`
-- Persist status changes
+- Persist execution result changes
 
 ### Persistence
 
@@ -83,6 +85,7 @@ The system currently includes several reliability concepts:
 - Maximum retry count
 - Stuck job timeout detection
 - Recovery from stale `Processing` state
+- Eligible job claiming through `JobClaimService`
 - Fail-fast execution behaviour
 - State transition validation
 - Execution result handling through `JobExecutionResultHandler`
@@ -144,8 +147,8 @@ This project is still evolving. Some known limitations are:
 
 - API controllers currently access `AppDbContext` directly.
 - API and worker currently run in the same project and process.
-- `JobWorker` still contains job claiming and execution orchestration responsibilities; stuck job recovery has been extracted into `JobRecoveryService`.
-- Test coverage is still early and currently focuses on state transitions, DTO mapping, retry policy, execution result handling, and stuck job recovery.
+- `JobWorker` still orchestrates the polling loop and execution flow; stuck job recovery and job claiming have been extracted into dedicated services.
+- Test coverage is still early and currently focuses on state transitions, DTO mapping, retry policy, execution result handling, stuck job recovery, and job claiming.
 - Docker, CI/CD, authentication, and production observability are not implemented yet.
 
 These limitations are intentional learning opportunities and will guide future refactoring.

@@ -17,6 +17,7 @@ builder.Services.AddScoped<JobRetryPolicy>();
 builder.Services.AddScoped<JobExecutionResultHandler>();
 builder.Services.AddScoped<JobExecutionService>();
 builder.Services.AddScoped<JobRecoveryService>();
+builder.Services.AddScoped<JobClaimService>();
 
 builder.Services.Configure<WorkerOptions>(builder.Configuration.GetSection("WorkerOptions"));
 

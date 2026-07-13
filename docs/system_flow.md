@@ -12,8 +12,7 @@ Client
 
 Background worker
   -> calls `JobRecoveryService` to recover stale `Processing` jobs
-  -> polls for eligible `Pending` jobs
-  -> marks one job as `Processing`
+  -> calls `JobClaimService` to claim the oldest eligible `Pending` job
   -> calls `JobExecutionService`
   -> `JobExecutionService` simulates execution
   -> `JobExecutionResultHandler` applies success or failure state changes
@@ -51,7 +50,7 @@ On each polling cycle, the worker:
 2. Resolves `AppDbContext`.
 3. Resolves `JobExecutionService`.
 4. Calls `JobRecoveryService` to recover stuck `Processing` jobs.
-5. Looks for the oldest eligible `Pending` job.
+5. Calls `JobClaimService` to claim the oldest eligible `Pending` job.
 
 A pending job is eligible when:
 
@@ -69,7 +68,7 @@ A job is considered stuck when:
 - `ProcessingStartedAtUtc` has a value
 - `ProcessingStartedAtUtc` is older than the configured stuck job timeout
 
-When a stuck job is found, the worker:
+When a stuck job is found, `JobRecoveryService`:
 
 - increments `RetryCount`
 - updates `UpdatedAtUtc`
@@ -93,7 +92,7 @@ This prevents jobs from staying in `Processing` forever after a crash, cancellat
 
 ## 4. Job Claiming
 
-After recovery, the worker looks for the oldest eligible pending job.
+After recovery, `JobClaimService` looks for the oldest eligible pending job.
 
 When it finds one, it attempts to claim it by setting:
 
@@ -101,9 +100,9 @@ When it finds one, it attempts to claim it by setting:
 - `ProcessingStartedAtUtc = now`
 - `UpdatedAtUtc = now`
 
-The worker then saves the change to the database.
+`JobClaimService` then saves the claim attempt to the database.
 
-If another worker has already claimed the same job, EF Core may raise a concurrency exception. In that case, the worker skips the job and waits for the next polling cycle.
+If another worker has already claimed the same job, EF Core may raise a concurrency exception. In that case, `JobClaimService` returns no claimed job and the worker waits for the next polling cycle.
 
 This is an early optimistic concurrency model. It is useful for learning, but future versions may improve this with an atomic claim operation.
 
@@ -250,6 +249,7 @@ Success
 - Retry behaviour is time-based through `NextRetryAtUtc`.
 - Stuck job recovery protects against jobs remaining in `Processing` forever.
 - The current execution logic is simulated and intentionally simple.
+- Job claiming is handled by `JobClaimService`.
 - `JobExecutionService` uses `TimeProvider` for execution timestamps.
 - Success and failure reactions are handled by `JobExecutionResultHandler`.
 - Retry decisions are handled by `JobRetryPolicy`.
