@@ -30,6 +30,7 @@ Client
   -> BackgroundService worker
   -> JobRecoveryService for stale Processing jobs
   -> JobClaimService for eligible Pending jobs
+  -> JobProcessor for claimed job processing
   -> JobExecutionService
   -> JobExecutionResultHandler
   -> JobRetryPolicy for failed attempts
@@ -60,8 +61,7 @@ Its responsibilities are:
 - Create scoped services per polling cycle
 - Delegate stuck processing job recovery to `JobRecoveryService`
 - Delegate eligible pending job claiming to `JobClaimService`
-- Delegate execution to `JobExecutionService`
-- Persist execution result changes
+- Delegate claimed job processing to `JobProcessor`
 
 ### Persistence
 
@@ -88,6 +88,7 @@ The system currently includes several reliability concepts:
 - Eligible job claiming through `JobClaimService`
 - Fail-fast execution behaviour
 - State transition validation
+- Claimed job processing through `JobProcessor`
 - Execution result handling through `JobExecutionResultHandler`
 - Execution timestamps through `TimeProvider`
 
@@ -147,7 +148,7 @@ This project is still evolving. Some known limitations are:
 
 - API controllers currently access `AppDbContext` directly.
 - API and worker currently run in the same project and process.
-- `JobWorker` still orchestrates the polling loop and execution flow; stuck job recovery and job claiming have been extracted into dedicated services.
+- `JobWorker` still orchestrates the polling loop and scoped worker services; recovery, claiming, and processing are handled by dedicated services.
 - Test coverage is still early and currently focuses on state transitions, DTO mapping, retry policy, execution result handling, stuck job recovery, and job claiming.
 - Docker, CI/CD, authentication, and production observability are not implemented yet.
 

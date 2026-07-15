@@ -29,10 +29,9 @@ public class JobWorker : BackgroundService
         {
             using var scope = _serviceScopeFactory.CreateScope();
 
-            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var executionService = scope.ServiceProvider.GetRequiredService<JobExecutionService>();
             var recoveryService = scope.ServiceProvider.GetRequiredService<JobRecoveryService>();
             var claimService = scope.ServiceProvider.GetRequiredService<JobClaimService>();
+            var processor = scope.ServiceProvider.GetRequiredService<JobProcessor>();
 
             await recoveryService.RecoverStuckJobsAsync(stoppingToken);
 
@@ -40,8 +39,7 @@ public class JobWorker : BackgroundService
 
             if (job != null)
             {
-                await executionService.ExecuteAsync(job, stoppingToken);
-                await dbContext.SaveChangesAsync(stoppingToken);
+                await processor.ProcessAsync(job, stoppingToken);
             }
 
             await Task.Delay(_workerOptions.PollingIntervalSeconds * 1000, stoppingToken);

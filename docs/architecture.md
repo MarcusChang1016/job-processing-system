@@ -4,7 +4,7 @@
 
 The current system is an ASP.NET Core application that hosts both a Web API and a background worker in the same process.
 
-The API is responsible for accepting client requests and exposing job state. The worker orchestrates polling, recovery, claiming, and execution by delegating recovery to `JobRecoveryService`, claiming to `JobClaimService`, execution to `JobExecutionService`, and failed-attempt decisions to `JobRetryPolicy`.
+The API is responsible for accepting client requests and exposing job state. The worker orchestrates polling, recovery, claiming, and execution by delegating recovery to `JobRecoveryService`, claiming to `JobClaimService`, processing to `JobProcessor`, execution to `JobExecutionService`, and failed-attempt decisions to `JobRetryPolicy`.
 
 The current architecture is intentionally simple:
 
@@ -15,6 +15,7 @@ Client
   -> BackgroundService worker
   -> JobRecoveryService
   -> JobClaimService
+  -> JobProcessor
   -> JobExecutionService
   -> JobExecutionResultHandler
   -> JobRetryPolicy
@@ -102,17 +103,15 @@ Responsibilities:
 - Create a scoped service provider for each polling cycle
 - Call `JobRecoveryService` to recover stale `Processing` jobs
 - Call `JobClaimService` to claim the next eligible `Pending` job
-- Call `JobExecutionService`
-- Persist the final job state
+- Call `JobProcessor` to process a claimed job
 - Wait for the next polling interval
 
-The worker is now mostly an orchestrator. It still coordinates scoped services, execution, and final result persistence.
+The worker is now mostly an orchestrator that coordinates scoped services and scheduling.
 
 Future improvement candidates:
 
-- `JobProcessor`
-- Move execution persistence into a smaller execution/application service
 - Improve claim concurrency with an atomic claim operation
+- Extract real job handlers when execution is no longer simulated
 
 ### Job Recovery
 
@@ -151,6 +150,23 @@ Responsibilities:
 - Handle optimistic concurrency conflicts by returning no claimed job
 
 `JobClaimService` keeps job selection and claim persistence out of `JobWorker`. This makes claim behaviour easier to test without testing the full background loop.
+
+### Job Processing
+
+Location:
+
+```text
+Services/JobProcessor.cs
+```
+
+Responsibilities:
+
+- Accept a claimed `Processing` job
+- Skip jobs that are not in `Processing`
+- Call `JobExecutionService` to execute the job
+- Persist execution result changes
+
+`JobProcessor` keeps execution persistence out of `JobWorker` while allowing `JobExecutionService` to focus on execution orchestration and result handling.
 
 ### Job Execution
 
@@ -300,9 +316,10 @@ Client
 Worker polling loop
   -> `JobRecoveryService` recovers stale Processing jobs through `JobRetryPolicy`
   -> `JobClaimService` claims the oldest eligible Pending job
-  -> Execute job
-  -> Mark as Success, Pending, or Failed
-  -> Save changes
+  -> `JobProcessor` processes the claimed job
+  -> `JobExecutionService` executes the job
+  -> `JobExecutionResultHandler` and `JobRetryPolicy` apply result state changes
+  -> `JobProcessor` saves execution result changes
 ```
 
 The worker uses polling rather than a message broker. This keeps the system simple while still allowing the project to explore background processing, retries, persistence, and concurrency.
@@ -359,12 +376,13 @@ Future observability improvements may include:
 
 The current architecture intentionally keeps some trade-offs visible:
 
-- API controllers access `AppDbContext` directly
-- API and worker run in the same project and process
-- `JobWorker` still orchestrates scoped services, execution, and final result persistence.
-- `JobExecutionService` uses `TimeProvider` for execution timestamps, but randomness and delay are still not abstracted
-- State transitions are not consistently enforced through `JobStateMachine`
+- API controllers access `AppDbContext` directly.
+- API and worker run in the same project and process.
+- `JobWorker` still orchestrates the polling loop and scoped worker services.
+- `JobExecutionService` uses `TimeProvider` for execution timestamps, but randomness and delay are still not abstracted.
+- State transitions are not consistently enforced through `JobStateMachine`.
 - Test coverage is still early and currently focuses on state transitions, DTO mapping, retry policy behaviour, recovery behaviour, claim behaviour, and execution result handling.
+- `JobProcessor` is intentionally thin and currently has limited direct test coverage because `JobExecutionService` is still concrete and simulation-heavy.
 
 These limitations are not failures. They are useful learning points and provide a clear path for future refactoring.
 
@@ -376,7 +394,7 @@ Direction:
 
 1. Continue expanding unit tests around job execution orchestration and worker behaviour.
 2. Improve testability around time, randomness, and execution simulation.
-3. Continue extracting worker sub-responsibilities from `JobWorker`, especially execution result persistence.
+3. Improve execution testability before extracting more worker responsibilities.
 4. Introduce an application layer once controller and worker use cases become clearer.
 5. Split projects only when the boundaries are understood well enough to justify the extra structure.
 

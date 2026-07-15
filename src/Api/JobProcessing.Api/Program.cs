@@ -18,6 +18,7 @@ builder.Services.AddScoped<JobExecutionResultHandler>();
 builder.Services.AddScoped<JobExecutionService>();
 builder.Services.AddScoped<JobRecoveryService>();
 builder.Services.AddScoped<JobClaimService>();
+builder.Services.AddScoped<JobProcessor>();
 
 builder.Services.Configure<WorkerOptions>(builder.Configuration.GetSection("WorkerOptions"));
 

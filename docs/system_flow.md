@@ -13,11 +13,12 @@ Client
 Background worker
   -> calls `JobRecoveryService` to recover stale `Processing` jobs
   -> calls `JobClaimService` to claim the oldest eligible `Pending` job
-  -> calls `JobExecutionService`
+  -> calls `JobProcessor` to process the claimed job
+  -> `JobProcessor` calls `JobExecutionService`
   -> `JobExecutionService` simulates execution
   -> `JobExecutionResultHandler` applies success or failure state changes
   -> `JobRetryPolicy` decides retry behaviour for failed attempts
-  -> EF Core saves the final state
+  -> `JobProcessor` saves the final state through EF Core
 ```
 
 ## 1. Job Creation
@@ -47,10 +48,10 @@ The background worker runs continuously using `BackgroundService`.
 On each polling cycle, the worker:
 
 1. Creates a scoped service provider.
-2. Resolves `AppDbContext`.
-3. Resolves `JobExecutionService`.
-4. Calls `JobRecoveryService` to recover stuck `Processing` jobs.
-5. Calls `JobClaimService` to claim the oldest eligible `Pending` job.
+2. Resolves scoped worker services.
+3. Calls `JobRecoveryService` to recover stuck `Processing` jobs.
+4. Calls `JobClaimService` to claim the oldest eligible `Pending` job.
+5. Calls `JobProcessor` when a job is successfully claimed.
 
 A pending job is eligible when:
 
@@ -108,7 +109,8 @@ This is an early optimistic concurrency model. It is useful for learning, but fu
 
 ## 5. Job Execution
 
-After a job is claimed, the worker calls `JobExecutionService`.
+After a job is claimed, the worker calls `JobProcessor`.
+`JobProcessor` verifies the job is in `Processing`, calls `JobExecutionService`, and saves the execution result changes.
 
 The current implementation simulates work by:
 
@@ -250,6 +252,7 @@ Success
 - Stuck job recovery protects against jobs remaining in `Processing` forever.
 - The current execution logic is simulated and intentionally simple.
 - Job claiming is handled by `JobClaimService`.
+- Claimed job processing and execution result persistence are handled by `JobProcessor`.
 - `JobExecutionService` uses `TimeProvider` for execution timestamps.
 - Success and failure reactions are handled by `JobExecutionResultHandler`.
 - Retry decisions are handled by `JobRetryPolicy`.
