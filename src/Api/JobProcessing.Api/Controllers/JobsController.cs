@@ -43,7 +43,7 @@ public class JobsController : ControllerBase
         _dbContext.Jobs.Add(job);
         await _dbContext.SaveChangesAsync();
 
-        return Ok(JobResponse.FromEntity(job));
+        return CreatedAtAction(nameof(GetJob), new { id = job.Id }, JobResponse.FromEntity(job));
     }
 
     [HttpPost("{id}/retry")]
