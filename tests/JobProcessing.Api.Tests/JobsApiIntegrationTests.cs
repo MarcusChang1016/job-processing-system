@@ -2,6 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using JobProcessing.Api.Contracts;
+using JobProcessing.Api.Enums;
+using JobProcessing.Api.Infrastructure;
+using JobProcessing.Api.Infrastructure.Entities;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace JobProcessing.Api.Tests;
 
@@ -69,5 +73,36 @@ public class JobsApiIntegrationTests
         var response = await client.PostAsync($"/jobs/{Guid.NewGuid()}/retry", content: null);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task RetryJob_WhenJobIsNotFailed_ReturnsBadRequest()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var jobId = Guid.NewGuid();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            dbContext.Jobs.Add(
+                new JobEntity
+                {
+                    Id = jobId,
+                    Status = JobStatus.Pending,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                    RetryCount = 0,
+                }
+            );
+
+            await dbContext.SaveChangesAsync();
+        }
+
+        var response = await client.PostAsync($"/jobs/{jobId}/retry", content: null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 }
