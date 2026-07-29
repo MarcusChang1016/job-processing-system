@@ -59,4 +59,15 @@ public class JobsApiIntegrationTests
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
+
+    [Fact]
+    public async Task RetryJob_WhenJobDoesNotExist_ReturnsNotFound()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.PostAsync($"/jobs/{Guid.NewGuid()}/retry", content: null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }
