@@ -61,6 +61,9 @@ public class JobsController : ControllerBase
         job.RetryCount = 0;
         job.UpdatedAtUtc = DateTime.UtcNow;
         job.NextRetryAtUtc = null;
+        job.CompletedAtUtc = null;
+        job.ProcessingStartedAtUtc = null;
+        job.LastErrorMessage = null;
 
         _dbContext.Jobs.Update(job);
         await _dbContext.SaveChangesAsync();

@@ -105,4 +105,59 @@ public class JobsApiIntegrationTests
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
+
+    [Fact]
+    public async Task RetryJob_WhenJobIsFailed_ReturnsRetriedJobAndClearsRetryState()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var jobId = Guid.NewGuid();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            dbContext.Jobs.Add(
+                new JobEntity
+                {
+                    Id = jobId,
+                    Status = JobStatus.Failed,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                    CompletedAtUtc = DateTime.UtcNow,
+                    NextRetryAtUtc = DateTime.UtcNow.AddMinutes(5),
+                    RetryCount = 3,
+                    LastErrorMessage = "Original failure",
+                }
+            );
+
+            await dbContext.SaveChangesAsync();
+        }
+
+        var postResponse = await client.PostAsync($"/jobs/{jobId}/retry", content: null);
+
+        postResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var job = await postResponse.Content.ReadFromJsonAsync<JobResponse>();
+
+        job.Should().NotBeNull();
+        job!.Id.Should().Be(jobId);
+        job.Status.Should().Be("Pending");
+        job.RetryCount.Should().Be(0);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var persistedJob = await dbContext.Jobs.FindAsync(jobId);
+
+            persistedJob.Should().NotBeNull();
+            persistedJob!.Status.Should().Be(JobStatus.Pending);
+            persistedJob.RetryCount.Should().Be(0);
+            persistedJob.NextRetryAtUtc.Should().BeNull();
+            persistedJob.CompletedAtUtc.Should().BeNull();
+            persistedJob.ProcessingStartedAtUtc.Should().BeNull();
+            persistedJob.LastErrorMessage.Should().BeNull();
+        }
+    }
 }
