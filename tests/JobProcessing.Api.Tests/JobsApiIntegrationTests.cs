@@ -48,4 +48,15 @@ public class JobsApiIntegrationTests
         fetchedJob.Id.Should().Be(createdJob.Id);
         fetchedJob.Status.Should().Be("Pending");
     }
+
+    [Fact]
+    public async Task GetJob_WhenJobDoesNotExist_ReturnsNotFound()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync($"/jobs/{Guid.NewGuid()}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }
