@@ -12,6 +12,14 @@ public class JobsController : ControllerBase
 {
     private readonly AppDbContext _dbContext;
 
+    private static ProblemDetails InvalidJobStateProblem() =>
+        new()
+        {
+            Status = StatusCodes.Status400BadRequest,
+            Title = "Invalid job state",
+            Detail = "Only failed jobs can be retried.",
+        };
+
     public JobsController(AppDbContext dbContext)
     {
         _dbContext = dbContext;
@@ -56,12 +64,7 @@ public class JobsController : ControllerBase
 
         if (job.Status != JobStatus.Failed)
         {
-            return BadRequest(new ProblemDetails
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Invalid job state",
-                Detail = "Only failed jobs can be retried.",
-            });
+            return BadRequest(InvalidJobStateProblem());
         }
 
         job.Status = JobStatus.Pending;
