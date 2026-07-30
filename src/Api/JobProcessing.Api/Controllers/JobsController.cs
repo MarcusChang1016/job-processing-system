@@ -55,7 +55,14 @@ public class JobsController : ControllerBase
             return NotFound();
 
         if (job.Status != JobStatus.Failed)
-            return BadRequest("Only failed jobs can be retried.");
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Invalid job state",
+                Detail = "Only failed jobs can be retried.",
+            });
+        }
 
         job.Status = JobStatus.Pending;
         job.RetryCount = 0;

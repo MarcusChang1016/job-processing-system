@@ -5,6 +5,7 @@ using JobProcessing.Api.Contracts;
 using JobProcessing.Api.Enums;
 using JobProcessing.Api.Infrastructure;
 using JobProcessing.Api.Infrastructure.Entities;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JobProcessing.Api.Tests;
@@ -98,6 +99,13 @@ public class JobsApiIntegrationTests
         var response = await client.PostAsync($"/jobs/{jobId}/retry", content: null);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+
+        problem.Should().NotBeNull();
+        problem!.Status.Should().Be((int)HttpStatusCode.BadRequest);
+        problem.Title.Should().Be("Invalid job state");
+        problem.Detail.Should().Be("Only failed jobs can be retried.");
     }
 
     [Fact]
