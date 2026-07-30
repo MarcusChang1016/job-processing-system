@@ -83,23 +83,17 @@ public class JobsApiIntegrationTests
 
         var jobId = Guid.NewGuid();
 
-        using (var scope = factory.Services.CreateScope())
-        {
-            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-            dbContext.Jobs.Add(
-                new JobEntity
-                {
-                    Id = jobId,
-                    Status = JobStatus.Pending,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    UpdatedAtUtc = DateTime.UtcNow,
-                    RetryCount = 0,
-                }
-            );
-
-            await dbContext.SaveChangesAsync();
-        }
+        await SeedJobAsync(
+            factory,
+            new JobEntity
+            {
+                Id = jobId,
+                Status = JobStatus.Pending,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow,
+                RetryCount = 0,
+            }
+        );
 
         var response = await client.PostAsync($"/jobs/{jobId}/retry", content: null);
 
@@ -114,26 +108,20 @@ public class JobsApiIntegrationTests
 
         var jobId = Guid.NewGuid();
 
-        using (var scope = factory.Services.CreateScope())
-        {
-            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-            dbContext.Jobs.Add(
-                new JobEntity
-                {
-                    Id = jobId,
-                    Status = JobStatus.Failed,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    UpdatedAtUtc = DateTime.UtcNow,
-                    CompletedAtUtc = DateTime.UtcNow,
-                    NextRetryAtUtc = DateTime.UtcNow.AddMinutes(5),
-                    RetryCount = 3,
-                    LastErrorMessage = "Original failure",
-                }
-            );
-
-            await dbContext.SaveChangesAsync();
-        }
+        await SeedJobAsync(
+            factory,
+            new JobEntity
+            {
+                Id = jobId,
+                Status = JobStatus.Failed,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow,
+                CompletedAtUtc = DateTime.UtcNow,
+                NextRetryAtUtc = DateTime.UtcNow.AddMinutes(5),
+                RetryCount = 3,
+                LastErrorMessage = "Original failure",
+            }
+        );
 
         var postResponse = await client.PostAsync($"/jobs/{jobId}/retry", content: null);
 
@@ -159,5 +147,14 @@ public class JobsApiIntegrationTests
             persistedJob.ProcessingStartedAtUtc.Should().BeNull();
             persistedJob.LastErrorMessage.Should().BeNull();
         }
+    }
+
+    private static async Task SeedJobAsync(CustomWebApplicationFactory factory, JobEntity job)
+    {
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        dbContext.Jobs.Add(job);
+        await dbContext.SaveChangesAsync();
     }
 }
