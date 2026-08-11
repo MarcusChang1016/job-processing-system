@@ -26,15 +26,18 @@ The current system runs the API and worker in the same ASP.NET Core process.
 ```text
 Client
   -> ASP.NET Core API
-  -> EF Core / SQLite
-  -> BackgroundService worker
+       -> Create/Get endpoints -> AppDbContext
+       -> Retry endpoint -> ManualJobRetryService -> AppDbContext
+
+BackgroundService worker
   -> JobRecoveryService for stale Processing jobs
   -> JobClaimService for eligible Pending jobs
   -> JobProcessor for claimed job processing
   -> JobExecutionService
   -> JobExecutionResultHandler
   -> JobRetryPolicy for failed attempts
-  -> update job status in database
+
+AppDbContext -> EF Core / SQLite
 ```
 
 This is currently a single-project modular monolith. It is not yet a full Clean Architecture solution, but it is structured so the project can evolve toward clearer application, infrastructure, and worker boundaries.
@@ -91,8 +94,11 @@ The system currently includes several reliability concepts:
 - Claimed job processing through `JobProcessor`
 - Execution result handling through `JobExecutionResultHandler`
 - Execution timestamps through `TimeProvider`
+- Explicit failed-job retry through `ManualJobRetryService`
 
 `JobRetryPolicy` owns the decision for what happens after a failed job attempt. A failed attempt can come from execution failure or stuck job recovery. It decides whether the job should return to `Pending` with retry cooldown or move to `Failed` after reaching the maximum retry count.
+
+`ManualJobRetryService` owns the separate client-initiated retry use case. It only accepts jobs already in `Failed`, returns them to `Pending`, resets their automatic retry budget, and clears previous execution state. `JobsController` maps the service outcome to the HTTP response without owning those business rules.
 
 These are intentionally implemented in a simple form first, so they can be tested and improved later.
 
@@ -132,7 +138,7 @@ The project will continue to grow in stages.
 Planned next areas:
 
 - Broader unit test coverage
-- Integration tests
+- Broader API integration test coverage
 - Testcontainers
 - Better separation between API, application logic, infrastructure, and worker concerns
 - Docker and Docker Compose
@@ -146,10 +152,10 @@ Planned next areas:
 
 This project is still evolving. Some known limitations are:
 
-- API controllers currently access `AppDbContext` directly.
+- The create and get job endpoints still access `AppDbContext` directly; manual retry is handled by a dedicated application-style service.
 - API and worker currently run in the same project and process.
 - `JobWorker` still orchestrates the polling loop and scoped worker services; recovery, claiming, and processing are handled by dedicated services.
-- Test coverage is still early and currently focuses on state transitions, DTO mapping, retry policy, execution result handling, stuck job recovery, and job claiming.
+- Test coverage currently includes state transitions, DTO mapping, retry policy, execution result handling, stuck job recovery, job claiming, database-backed manual retry service tests, and Jobs API integration tests.
 - Docker, CI/CD, authentication, and production observability are not implemented yet.
 
 These limitations are intentional learning opportunities and will guide future refactoring.

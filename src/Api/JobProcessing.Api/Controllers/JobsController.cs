@@ -2,6 +2,7 @@ using JobProcessing.Api.Contracts;
 using JobProcessing.Api.Enums;
 using JobProcessing.Api.Infrastructure;
 using JobProcessing.Api.Infrastructure.Entities;
+using JobProcessing.Api.Jobs;
 using Microsoft.AspNetCore.Mvc;
 
 namespace JobProcessing.Api.Controllers;
@@ -11,6 +12,7 @@ namespace JobProcessing.Api.Controllers;
 public class JobsController : ControllerBase
 {
     private readonly AppDbContext _dbContext;
+    private readonly ManualJobRetryService _manualJobRetryService;
 
     private static ProblemDetails InvalidJobStateProblem() =>
         new()
@@ -20,9 +22,10 @@ public class JobsController : ControllerBase
             Detail = "Only failed jobs can be retried.",
         };
 
-    public JobsController(AppDbContext dbContext)
+    public JobsController(AppDbContext dbContext, ManualJobRetryService manualJobRetryService)
     {
         _dbContext = dbContext;
+        _manualJobRetryService = manualJobRetryService;
     }
 
     [HttpGet("{id}")]
@@ -55,29 +58,28 @@ public class JobsController : ControllerBase
     }
 
     [HttpPost("{id}/retry")]
-    public async Task<IActionResult> RetryJob(Guid id)
+    public async Task<IActionResult> RetryJob(Guid id, CancellationToken cancellationToken)
     {
-        var job = await _dbContext.Jobs.FindAsync(id);
+        var result = await _manualJobRetryService.RetryAsync(id, cancellationToken);
 
-        if (job == null)
-            return NotFound();
-
-        if (job.Status != JobStatus.Failed)
+        switch (result.Outcome)
         {
-            return BadRequest(InvalidJobStateProblem());
+            case ManualJobRetryOutcome.NotFound:
+                return NotFound();
+
+            case ManualJobRetryOutcome.InvalidState:
+                return BadRequest(InvalidJobStateProblem());
+
+            case ManualJobRetryOutcome.Succeeded:
+                if (result.Job is null)
+                    throw new InvalidOperationException("Successful retry result has no job.");
+
+                return Ok(JobResponse.FromEntity(result.Job));
+
+            default:
+                throw new InvalidOperationException(
+                    $"Unknown manual retry outcome: {result.Outcome}"
+                );
         }
-
-        job.Status = JobStatus.Pending;
-        job.RetryCount = 0;
-        job.UpdatedAtUtc = DateTime.UtcNow;
-        job.NextRetryAtUtc = null;
-        job.CompletedAtUtc = null;
-        job.ProcessingStartedAtUtc = null;
-        job.LastErrorMessage = null;
-
-        _dbContext.Jobs.Update(job);
-        await _dbContext.SaveChangesAsync();
-
-        return Ok(JobResponse.FromEntity(job));
     }
 }

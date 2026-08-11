@@ -4,22 +4,25 @@
 
 The current system is an ASP.NET Core application that hosts both a Web API and a background worker in the same process.
 
-The API is responsible for accepting client requests and exposing job state. The worker orchestrates polling, recovery, claiming, and execution by delegating recovery to `JobRecoveryService`, claiming to `JobClaimService`, processing to `JobProcessor`, execution to `JobExecutionService`, and failed-attempt decisions to `JobRetryPolicy`.
+The API is responsible for accepting client requests and exposing job state. Job creation and reads currently use `AppDbContext` directly, while manual retry is delegated to `ManualJobRetryService`. The worker orchestrates polling, recovery, claiming, and execution by delegating recovery to `JobRecoveryService`, claiming to `JobClaimService`, processing to `JobProcessor`, execution to `JobExecutionService`, and failed-attempt decisions to `JobRetryPolicy`.
 
 The current architecture is intentionally simple:
 
 ```text
 Client
   -> ASP.NET Core API
-  -> EF Core / SQLite
-  -> BackgroundService worker
+       -> Create/Get endpoints -> AppDbContext
+       -> Retry endpoint -> ManualJobRetryService -> AppDbContext
+
+BackgroundService worker
   -> JobRecoveryService
   -> JobClaimService
   -> JobProcessor
   -> JobExecutionService
   -> JobExecutionResultHandler
   -> JobRetryPolicy
-  -> EF Core / SQLite
+
+AppDbContext -> EF Core / SQLite
 ```
 
 This is currently a single-project modular monolith. It is not yet a full Clean Architecture implementation, but it provides a practical foundation for learning backend architecture, background processing, reliability, persistence, and testing.
@@ -32,6 +35,7 @@ src/Api/JobProcessing.Api
   Contracts/
   Enums/
   Infrastructure/
+  Jobs/
   Migrations/
   Models/
   Services/
@@ -67,7 +71,7 @@ Responsibilities:
 - Accept HTTP requests
 - Create jobs
 - Return job status
-- Retry failed jobs
+- Map manual retry outcomes to HTTP responses
 - Return basic metrics
 - Convert persisted entities into API response DTOs
 
@@ -79,15 +83,39 @@ Current endpoints:
 - `GET /metrics`
 - `GET /health`
 
-The API currently depends directly on `AppDbContext`. This is acceptable for the current learning stage, but it means HTTP concerns and persistence concerns are still coupled.
+The create and get endpoints currently depend directly on `AppDbContext`. The manual retry endpoint delegates its use-case rules and persistence to `ManualJobRetryService`, while the controller remains responsible for mapping outcomes to HTTP status codes, `ProblemDetails`, and response DTOs.
 
 Future improvement:
 
 ```text
 Controller
   -> Application service
-  -> Persistence abstraction or DbContext
+  -> DbContext
 ```
+
+### Manual Job Retry
+
+Location:
+
+```text
+Jobs/ManualJobRetryService.cs
+Jobs/ManualJobRetryResult.cs
+Jobs/ManualJobRetryOutcome.cs
+```
+
+Responsibilities:
+
+- Find the requested job
+- Allow manual retry only when the job is `Failed`
+- Return the job to `Pending`
+- Reset the automatic retry count and clear previous execution state
+- Use `TimeProvider` when updating `UpdatedAtUtc`
+- Persist the state change
+- Return HTTP-independent `Succeeded`, `NotFound`, or `InvalidState` outcomes
+
+`ManualJobRetryService` keeps the manual retry use case out of `JobsController`. The controller maps its result to `200 OK`, `404 Not Found`, or `400 Bad Request` and owns the API-specific `ProblemDetails` response.
+
+Manual retry is distinct from automatic retry. `JobRetryPolicy` decides what happens after a failed execution attempt, while `ManualJobRetryService` handles an explicit client request to restart a job that has already reached `Failed`.
 
 ### Background Worker
 
@@ -341,6 +369,13 @@ The system also supports stuck job recovery:
 
 Stuck job recovery now uses the same retry policy as execution failure.
 
+Manual retry is handled separately by `ManualJobRetryService`:
+
+- Only jobs already in `Failed` can be manually retried
+- A manual retry returns the job to `Pending`
+- The automatic retry count is reset so the new processing cycle has a fresh retry budget
+- Previous retry scheduling, completion, processing, and error state is cleared
+
 ## Concurrency
 
 The system includes an optimistic concurrency concept using `RowVersion`.
@@ -376,12 +411,12 @@ Future observability improvements may include:
 
 The current architecture intentionally keeps some trade-offs visible:
 
-- API controllers access `AppDbContext` directly.
+- The create and get job endpoints still access `AppDbContext` directly; manual retry now uses a dedicated application-style service.
 - API and worker run in the same project and process.
 - `JobWorker` still orchestrates the polling loop and scoped worker services.
 - `JobExecutionService` uses `TimeProvider` for execution timestamps, but randomness and delay are still not abstracted.
 - State transitions are not consistently enforced through `JobStateMachine`.
-- Test coverage is still early and currently focuses on state transitions, DTO mapping, retry policy behaviour, recovery behaviour, claim behaviour, and execution result handling.
+- Test coverage includes state transitions, DTO mapping, retry policy behaviour, recovery, claiming, execution result handling, database-backed manual retry service tests, and Jobs API integration tests.
 - `JobProcessor` is intentionally thin and currently has limited direct test coverage because `JobExecutionService` is still concrete and simulation-heavy.
 
 These limitations are not failures. They are useful learning points and provide a clear path for future refactoring.
@@ -395,7 +430,7 @@ Direction:
 1. Continue expanding unit tests around job execution orchestration and worker behaviour.
 2. Improve testability around time, randomness, and execution simulation.
 3. Improve execution testability before extracting more worker responsibilities.
-4. Introduce an application layer once controller and worker use cases become clearer.
+4. Continue extracting focused application use cases when controller or worker responsibilities justify it.
 5. Split projects only when the boundaries are understood well enough to justify the extra structure.
 
 The goal is to grow toward cleaner architecture gradually while keeping the system understandable.

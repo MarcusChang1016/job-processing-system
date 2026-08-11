@@ -1,4 +1,5 @@
 using JobProcessing.Api.Infrastructure;
+using JobProcessing.Api.Jobs;
 using JobProcessing.Api.Models;
 using JobProcessing.Api.Services;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +20,7 @@ builder.Services.AddScoped<JobExecutionService>();
 builder.Services.AddScoped<JobRecoveryService>();
 builder.Services.AddScoped<JobClaimService>();
 builder.Services.AddScoped<JobProcessor>();
+builder.Services.AddScoped<ManualJobRetryService>();
 
 builder.Services.Configure<WorkerOptions>(builder.Configuration.GetSection("WorkerOptions"));
 
