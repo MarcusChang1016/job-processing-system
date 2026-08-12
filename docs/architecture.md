@@ -105,6 +105,7 @@ Location:
 Application/Jobs/ManualJobRetryService.cs
 Application/Jobs/ManualJobRetryResult.cs
 Application/Jobs/ManualJobRetryOutcome.cs
+Application/Jobs/JobDetails.cs
 ```
 
 Responsibilities:
@@ -116,10 +117,13 @@ Responsibilities:
 - Use `TimeProvider` when updating `UpdatedAtUtc`
 - Persist the state change
 - Return HTTP-independent `Succeeded`, `NotFound`, or `InvalidState` outcomes
+- Return successful job data as application-level `JobDetails` rather than exposing `JobEntity`
 
 `ManualJobRetryService` keeps the manual retry use case out of `JobsController`. The controller maps its result to `200 OK`, `404 Not Found`, or `400 Bad Request` and owns the API-specific `ProblemDetails` response.
 
 Manual retry is distinct from automatic retry. `JobRetryPolicy` decides what happens after a failed execution attempt, while `ManualJobRetryService` handles an explicit client request to restart a job that has already reached `Failed`.
+
+On success, the service maps the persisted `JobEntity` to an immutable `JobDetails` read model. The controller then maps `JobDetails` to `JobResponse`, keeping EF Core persistence models out of the manual retry application contract.
 
 ### Background Worker
 

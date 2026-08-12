@@ -39,6 +39,15 @@ public class ManualJobRetryService
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return ManualJobRetryResult.Succeeded(job);
+        var jobDetails = new JobDetails(
+            Id: job.Id,
+            Status: job.Status,
+            CreatedAtUtc: job.CreatedAtUtc,
+            UpdatedAtUtc: job.UpdatedAtUtc,
+            RetryCount: job.RetryCount,
+            CompletedAtUtc: job.CompletedAtUtc
+        );
+
+        return ManualJobRetryResult.Succeeded(jobDetails);
     }
 }

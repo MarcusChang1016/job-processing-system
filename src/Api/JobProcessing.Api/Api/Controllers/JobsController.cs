@@ -1,8 +1,8 @@
+using JobProcessing.Api.Application.Jobs;
 using JobProcessing.Api.Contracts;
 using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure;
 using JobProcessing.Api.Infrastructure.Entities;
-using JobProcessing.Api.Application.Jobs;
 using Microsoft.AspNetCore.Mvc;
 
 namespace JobProcessing.Api.Controllers;
@@ -74,7 +74,7 @@ public class JobsController : ControllerBase
                 if (result.Job is null)
                     throw new InvalidOperationException("Successful retry result has no job.");
 
-                return Ok(JobResponse.FromEntity(result.Job));
+                return Ok(JobResponse.FromJobDetails(result.Job));
 
             default:
                 throw new InvalidOperationException(

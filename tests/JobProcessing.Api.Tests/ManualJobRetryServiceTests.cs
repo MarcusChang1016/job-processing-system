@@ -1,7 +1,7 @@
 using FluentAssertions;
+using JobProcessing.Api.Application.Jobs;
 using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure.Entities;
-using JobProcessing.Api.Application.Jobs;
 using JobProcessing.Api.Tests.Infrastructure;
 
 namespace JobProcessing.Api.Tests;
@@ -108,11 +108,18 @@ public class ManualJobRetryServiceTests
         var result = await service.RetryAsync(jobId, CancellationToken.None);
 
         result.Outcome.Should().Be(ManualJobRetryOutcome.Succeeded);
-        result.Job.Should().NotBeNull();
-        result.Job!.Id.Should().Be(jobId);
-        result.Job.Status.Should().Be(JobStatus.Pending);
-        result.Job.RetryCount.Should().Be(0);
-        result.Job.UpdatedAtUtc.Should().Be(now.UtcDateTime);
+        result
+            .Job.Should()
+            .Be(
+                new JobDetails(
+                    Id: jobId,
+                    Status: JobStatus.Pending,
+                    CreatedAtUtc: originalCreatedAt,
+                    UpdatedAtUtc: now.UtcDateTime,
+                    RetryCount: 0,
+                    CompletedAtUtc: null
+                )
+            );
 
         dbContext.ChangeTracker.Clear();
 

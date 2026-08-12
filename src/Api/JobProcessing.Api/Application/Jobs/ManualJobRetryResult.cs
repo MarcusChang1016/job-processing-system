@@ -1,10 +1,8 @@
-using JobProcessing.Api.Infrastructure.Entities;
-
 namespace JobProcessing.Api.Application.Jobs;
 
 public sealed class ManualJobRetryResult
 {
-    private ManualJobRetryResult(ManualJobRetryOutcome outcome, JobEntity? job)
+    private ManualJobRetryResult(ManualJobRetryOutcome outcome, JobDetails? job)
     {
         Outcome = outcome;
         Job = job;
@@ -12,9 +10,9 @@ public sealed class ManualJobRetryResult
 
     public ManualJobRetryOutcome Outcome { get; }
 
-    public JobEntity? Job { get; }
+    public JobDetails? Job { get; }
 
-    public static ManualJobRetryResult Succeeded(JobEntity job)
+    public static ManualJobRetryResult Succeeded(JobDetails job)
     {
         ArgumentNullException.ThrowIfNull(job);
         return new(ManualJobRetryOutcome.Succeeded, job);

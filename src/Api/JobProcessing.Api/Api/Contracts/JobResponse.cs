@@ -1,3 +1,4 @@
+using JobProcessing.Api.Application.Jobs;
 using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure.Entities;
 
@@ -24,5 +25,18 @@ public record JobResponse
             CompletedAt = entity.CompletedAtUtc,
             FailureReason =
                 entity.Status == JobStatus.Failed ? "Job failed after maximum retries." : null,
+        };
+
+    public static JobResponse FromJobDetails(JobDetails job) =>
+        new()
+        {
+            Id = job.Id,
+            Status = job.Status.ToString(),
+            CreatedAt = job.CreatedAtUtc,
+            UpdatedAt = job.UpdatedAtUtc,
+            RetryCount = job.RetryCount,
+            CompletedAt = job.CompletedAtUtc,
+            FailureReason =
+                job.Status == JobStatus.Failed ? "Job failed after maximum retries." : null,
         };
 }

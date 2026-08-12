@@ -115,6 +115,8 @@ public class JobsApiIntegrationTests
         var client = factory.CreateClient();
 
         var jobId = Guid.NewGuid();
+        var createdAt = new DateTime(2026, 08, 12, 8, 0, 0, DateTimeKind.Utc);
+        var previousUpdatedAt = createdAt.AddMinutes(30);
 
         await SeedJobAsync(
             factory,
@@ -122,9 +124,9 @@ public class JobsApiIntegrationTests
             {
                 Id = jobId,
                 Status = JobStatus.Failed,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow,
-                CompletedAtUtc = DateTime.UtcNow,
+                CreatedAtUtc = createdAt,
+                UpdatedAtUtc = previousUpdatedAt,
+                CompletedAtUtc = previousUpdatedAt,
                 NextRetryAtUtc = DateTime.UtcNow.AddMinutes(5),
                 RetryCount = 3,
                 LastErrorMessage = "Original failure",
@@ -141,20 +143,22 @@ public class JobsApiIntegrationTests
         job!.Id.Should().Be(jobId);
         job.Status.Should().Be("Pending");
         job.RetryCount.Should().Be(0);
+        job.CreatedAt.Should().Be(createdAt);
+        job.UpdatedAt.Should().BeAfter(previousUpdatedAt);
+        job.CompletedAt.Should().BeNull();
+        job.FailureReason.Should().BeNull();
 
-        using (var scope = factory.Services.CreateScope())
-        {
-            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var persistedJob = await dbContext.Jobs.FindAsync(jobId);
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var persistedJob = await dbContext.Jobs.FindAsync(jobId);
 
-            persistedJob.Should().NotBeNull();
-            persistedJob!.Status.Should().Be(JobStatus.Pending);
-            persistedJob.RetryCount.Should().Be(0);
-            persistedJob.NextRetryAtUtc.Should().BeNull();
-            persistedJob.CompletedAtUtc.Should().BeNull();
-            persistedJob.ProcessingStartedAtUtc.Should().BeNull();
-            persistedJob.LastErrorMessage.Should().BeNull();
-        }
+        persistedJob.Should().NotBeNull();
+        persistedJob!.Status.Should().Be(JobStatus.Pending);
+        persistedJob.RetryCount.Should().Be(0);
+        persistedJob.NextRetryAtUtc.Should().BeNull();
+        persistedJob.CompletedAtUtc.Should().BeNull();
+        persistedJob.ProcessingStartedAtUtc.Should().BeNull();
+        persistedJob.LastErrorMessage.Should().BeNull();
     }
 
     private static async Task SeedJobAsync(CustomWebApplicationFactory factory, JobEntity job)

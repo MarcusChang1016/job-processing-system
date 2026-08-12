@@ -1,4 +1,5 @@
 using FluentAssertions;
+using JobProcessing.Api.Application.Jobs;
 using JobProcessing.Api.Contracts;
 using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure.Entities;
@@ -91,5 +92,28 @@ public class JobResponseTests
         var response = JobResponse.FromEntity(entity);
 
         response.CompletedAt.Should().Be(entity.CompletedAtUtc);
+    }
+
+    [Fact]
+    public void FromJobDetails_ShouldMapApplicationResult()
+    {
+        var details = new JobDetails(
+            Id: Guid.NewGuid(),
+            Status: JobStatus.Pending,
+            CreatedAtUtc: new DateTime(2026, 08, 12, 10, 0, 0, DateTimeKind.Utc),
+            UpdatedAtUtc: new DateTime(2026, 08, 12, 11, 0, 0, DateTimeKind.Utc),
+            RetryCount: 0,
+            CompletedAtUtc: null
+        );
+
+        var response = JobResponse.FromJobDetails(details);
+
+        response.Id.Should().Be(details.Id);
+        response.Status.Should().Be("Pending");
+        response.CreatedAt.Should().Be(details.CreatedAtUtc);
+        response.UpdatedAt.Should().Be(details.UpdatedAtUtc);
+        response.RetryCount.Should().Be(details.RetryCount);
+        response.CompletedAt.Should().Be(details.CompletedAtUtc);
+        response.FailureReason.Should().BeNull();
     }
 }
