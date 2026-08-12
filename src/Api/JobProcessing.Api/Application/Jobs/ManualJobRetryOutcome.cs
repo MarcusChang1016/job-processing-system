@@ -1,4 +1,4 @@
-namespace JobProcessing.Api.Jobs;
+namespace JobProcessing.Api.Application.Jobs;
 
 public enum ManualJobRetryOutcome
 {

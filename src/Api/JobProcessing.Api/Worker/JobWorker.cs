@@ -1,8 +1,8 @@
 using JobProcessing.Api.Infrastructure;
-using JobProcessing.Api.Models;
+using JobProcessing.Api.Options;
 using Microsoft.Extensions.Options;
 
-namespace JobProcessing.Api.Services;
+namespace JobProcessing.Api.Worker;
 
 public class JobWorker : BackgroundService
 {

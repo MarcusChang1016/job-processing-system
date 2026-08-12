@@ -1,8 +1,8 @@
 using FluentAssertions;
-using JobProcessing.Api.Enums;
+using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure.Entities;
-using JobProcessing.Api.Models;
-using JobProcessing.Api.Services;
+using JobProcessing.Api.Options;
+using JobProcessing.Api.Worker;
 using Microsoft.Extensions.Options;
 
 namespace JobProcessing.Api.Tests;
@@ -12,7 +12,7 @@ public class JobRetryPolicyTests
     [Fact]
     public void ApplyFailedAttempt_ShouldSetJobToPending_WhenRetryCountIsBelowMaxRetryCount()
     {
-        var options = Options.Create(
+        var options = Microsoft.Extensions.Options.Options.Create(
             new WorkerOptions { MaxRetryCount = 3, RetryCooldownSeconds = 30 }
         );
 
@@ -42,7 +42,7 @@ public class JobRetryPolicyTests
     [Fact]
     public void ApplyFailedAttempt_ShouldSetJobToFailed_WhenRetryCountReachesMaxRetryCount()
     {
-        var options = Options.Create(
+        var options = Microsoft.Extensions.Options.Options.Create(
             new WorkerOptions { MaxRetryCount = 3, RetryCooldownSeconds = 30 }
         );
 
@@ -72,7 +72,7 @@ public class JobRetryPolicyTests
     [Fact]
     public void ApplyFailedAttempt_ShouldSetJobToFailed_WhenMaxRetryCountIsOne()
     {
-        var options = Options.Create(
+        var options = Microsoft.Extensions.Options.Options.Create(
             new WorkerOptions { MaxRetryCount = 1, RetryCooldownSeconds = 30 }
         );
 
@@ -102,7 +102,7 @@ public class JobRetryPolicyTests
     [Fact]
     public void ApplyFailedAttempt_ShouldSetNextRetryAtUtcToNow_WhenRetryCooldownSecondsIsZero()
     {
-        var options = Options.Create(
+        var options = Microsoft.Extensions.Options.Options.Create(
             new WorkerOptions { MaxRetryCount = 3, RetryCooldownSeconds = 0 }
         );
 

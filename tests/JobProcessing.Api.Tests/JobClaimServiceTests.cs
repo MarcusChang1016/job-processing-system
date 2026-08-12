@@ -1,9 +1,9 @@
 using FluentAssertions;
-using JobProcessing.Api.Enums;
+using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure;
 using JobProcessing.Api.Infrastructure.Entities;
-using JobProcessing.Api.Models;
-using JobProcessing.Api.Services;
+using JobProcessing.Api.Options;
+using JobProcessing.Api.Worker;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -23,7 +23,7 @@ public class JobClaimServiceTests
     {
         var now = new DateTimeOffset(2026, 07, 09, 23, 0, 0, TimeSpan.Zero);
 
-        var workerOptions = Options.Create(
+        var workerOptions = Microsoft.Extensions.Options.Options.Create(
             new WorkerOptions
             {
                 MaxRetryCount = 3,

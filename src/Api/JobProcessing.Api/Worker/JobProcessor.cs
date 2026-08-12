@@ -1,8 +1,8 @@
-using JobProcessing.Api.Enums;
+using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure;
 using JobProcessing.Api.Infrastructure.Entities;
 
-namespace JobProcessing.Api.Services;
+namespace JobProcessing.Api.Worker;
 
 public class JobProcessor
 {

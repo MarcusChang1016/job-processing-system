@@ -1,8 +1,8 @@
 using FluentAssertions;
-using JobProcessing.Api.Enums;
+using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure.Entities;
-using JobProcessing.Api.Models;
-using JobProcessing.Api.Services;
+using JobProcessing.Api.Options;
+using JobProcessing.Api.Worker;
 using Microsoft.Extensions.Options;
 
 namespace JobProcessing.Api.Tests;
@@ -12,7 +12,7 @@ public class JobExecutionResultHandlerTests
     [Fact]
     public void ApplySuccess_ShouldApplySuccessStateToJob()
     {
-        var options = Options.Create(
+        var options = Microsoft.Extensions.Options.Options.Create(
             new WorkerOptions { MaxRetryCount = 1, RetryCooldownSeconds = 30 }
         );
 
@@ -44,7 +44,7 @@ public class JobExecutionResultHandlerTests
     [Fact]
     public void ApplyFailure_ShouldMarkJobAsFailed_WhenRetryPolicyReachesMaxRetryCount()
     {
-        var options = Options.Create(
+        var options = Microsoft.Extensions.Options.Options.Create(
             new WorkerOptions { MaxRetryCount = 1, RetryCooldownSeconds = 30 }
         );
 

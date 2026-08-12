@@ -1,7 +1,7 @@
-using JobProcessing.Api.Enums;
+using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure;
 
-namespace JobProcessing.Api.Jobs;
+namespace JobProcessing.Api.Application.Jobs;
 
 public class ManualJobRetryService
 {

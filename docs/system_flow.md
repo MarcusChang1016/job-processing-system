@@ -184,6 +184,9 @@ Status = Pending
 RetryCount = 0
 UpdatedAtUtc = now
 NextRetryAtUtc = null
+CompletedAtUtc = null
+ProcessingStartedAtUtc = null
+LastErrorMessage = null
 ```
 
 The worker can then pick it up again in a future polling cycle.

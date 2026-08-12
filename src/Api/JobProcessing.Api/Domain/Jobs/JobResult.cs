@@ -1,4 +1,4 @@
-namespace JobProcessing.Api.Models;
+namespace JobProcessing.Api.Domain.Jobs;
 
 public record JobResult
 {

@@ -1,8 +1,9 @@
+using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure.Entities;
-using JobProcessing.Api.Models;
+using JobProcessing.Api.Options;
 using Microsoft.Extensions.Options;
 
-namespace JobProcessing.Api.Services;
+namespace JobProcessing.Api.Worker;
 
 public class JobExecutionService
 {

@@ -1,5 +1,5 @@
 using System.ComponentModel.DataAnnotations;
-using JobProcessing.Api.Enums;
+using JobProcessing.Api.Domain.Jobs;
 
 namespace JobProcessing.Api.Infrastructure.Entities;
 

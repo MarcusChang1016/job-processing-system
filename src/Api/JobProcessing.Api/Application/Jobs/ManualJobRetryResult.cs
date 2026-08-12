@@ -1,6 +1,6 @@
 using JobProcessing.Api.Infrastructure.Entities;
 
-namespace JobProcessing.Api.Jobs;
+namespace JobProcessing.Api.Application.Jobs;
 
 public sealed class ManualJobRetryResult
 {

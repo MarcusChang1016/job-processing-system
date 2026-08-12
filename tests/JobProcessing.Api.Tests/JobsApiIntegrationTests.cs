@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using JobProcessing.Api.Contracts;
-using JobProcessing.Api.Enums;
+using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure;
 using JobProcessing.Api.Infrastructure.Entities;
 using Microsoft.AspNetCore.Mvc;

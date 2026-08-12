@@ -1,6 +1,4 @@
-using JobProcessing.Api.Enums;
-
-namespace JobProcessing.Api.Services;
+namespace JobProcessing.Api.Domain.Jobs;
 
 public static class JobStateMachine
 {

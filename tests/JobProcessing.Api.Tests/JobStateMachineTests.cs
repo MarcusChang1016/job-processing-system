@@ -1,6 +1,5 @@
 ﻿using FluentAssertions;
-using JobProcessing.Api.Enums;
-using JobProcessing.Api.Services;
+using JobProcessing.Api.Domain.Jobs;
 
 namespace JobProcessing.Api.Tests;
 

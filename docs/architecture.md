@@ -31,17 +31,21 @@ This is currently a single-project modular monolith. It is not yet a full Clean 
 
 ```text
 src/Api/JobProcessing.Api
-  Controllers/
-  Contracts/
-  Enums/
+  Api/
+    Controllers/
+    Contracts/
+  Application/
+    Jobs/
+  Domain/
+    Jobs/
   Infrastructure/
-  Jobs/
-  Migrations/
-  Models/
-  Services/
+    Entities/
+    Migrations/
+  Options/
+  Worker/
 ```
 
-All application code currently lives in one project. The folders provide organisation, but they do not yet enforce architectural boundaries.
+All application code currently lives in one project. The folders express boundaries inside the modular monolith, but they do not yet enforce architectural boundaries at the project/assembly level.
 
 Future versions may split the system into separate projects such as:
 
@@ -62,8 +66,8 @@ That split is not required yet. The current priority is to understand the respon
 Location:
 
 ```text
-Controllers/
-Contracts/
+Api/Controllers/
+Api/Contracts/
 ```
 
 Responsibilities:
@@ -98,9 +102,9 @@ Controller
 Location:
 
 ```text
-Jobs/ManualJobRetryService.cs
-Jobs/ManualJobRetryResult.cs
-Jobs/ManualJobRetryOutcome.cs
+Application/Jobs/ManualJobRetryService.cs
+Application/Jobs/ManualJobRetryResult.cs
+Application/Jobs/ManualJobRetryOutcome.cs
 ```
 
 Responsibilities:
@@ -122,7 +126,7 @@ Manual retry is distinct from automatic retry. `JobRetryPolicy` decides what hap
 Location:
 
 ```text
-Services/JobWorker.cs
+Worker/JobWorker.cs
 ```
 
 Responsibilities:
@@ -146,7 +150,7 @@ Future improvement candidates:
 Location:
 
 ```text
-Services/JobRecoveryService.cs
+Worker/JobRecoveryService.cs
 ```
 
 Responsibilities:
@@ -164,7 +168,7 @@ Responsibilities:
 Location:
 
 ```text
-Services/JobClaimService.cs
+Worker/JobClaimService.cs
 ```
 
 Responsibilities:
@@ -184,7 +188,7 @@ Responsibilities:
 Location:
 
 ```text
-Services/JobProcessor.cs
+Worker/JobProcessor.cs
 ```
 
 Responsibilities:
@@ -201,7 +205,7 @@ Responsibilities:
 Location:
 
 ```text
-Services/JobExecutionService.cs
+Worker/JobExecutionService.cs
 ```
 
 Responsibilities:
@@ -221,7 +225,7 @@ It still owns simulated randomness, delay, logging, and `TimeProvider` usage. Th
 Location:
 
 ```text
-Services/JobExecutionResultHandler.cs
+Worker/JobExecutionResultHandler.cs
 ```
 
 Responsibilities:
@@ -239,7 +243,7 @@ This handler exists so `JobExecutionService` does not need to know the details o
 Location:
 
 ```text
-Services/JobRetryPolicy.cs
+Worker/JobRetryPolicy.cs
 ```
 
 Responsibilities:
@@ -261,7 +265,8 @@ Location:
 
 ```text
 Infrastructure/
-Migrations/
+Infrastructure/Entities/
+Infrastructure/Migrations/
 ```
 
 Responsibilities:
@@ -283,14 +288,16 @@ The current database provider is SQLite.
 Location:
 
 ```text
-Enums/JobStatus.cs
-Services/JobStateMachine.cs
+Domain/Jobs/JobStatus.cs
+Domain/Jobs/JobStateMachine.cs
+Domain/Jobs/JobResult.cs
 ```
 
 Responsibilities:
 
 - Define possible job statuses
 - Define allowed status transitions
+- Define job execution result log shape
 
 Current job statuses:
 
@@ -413,7 +420,7 @@ The current architecture intentionally keeps some trade-offs visible:
 
 - The create and get job endpoints still access `AppDbContext` directly; manual retry now uses a dedicated application-style service.
 - API and worker run in the same project and process.
-- `JobWorker` still orchestrates the polling loop and scoped worker services.
+- `JobWorker` still orchestrates the polling loop and scoped worker services, but worker code is now grouped under `Worker/`.
 - `JobExecutionService` uses `TimeProvider` for execution timestamps, but randomness and delay are still not abstracted.
 - State transitions are not consistently enforced through `JobStateMachine`.
 - Test coverage includes state transitions, DTO mapping, retry policy behaviour, recovery, claiming, execution result handling, database-backed manual retry service tests, and Jobs API integration tests.

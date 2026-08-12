@@ -42,6 +42,24 @@ AppDbContext -> EF Core / SQLite
 
 This is currently a single-project modular monolith. It is not yet a full Clean Architecture solution, but it is structured so the project can evolve toward clearer application, infrastructure, and worker boundaries.
 
+Current source organisation:
+
+```text
+src/Api/JobProcessing.Api
+  Api/
+    Controllers/
+    Contracts/
+  Application/
+    Jobs/
+  Domain/
+    Jobs/
+  Infrastructure/
+    Entities/
+    Migrations/
+  Options/
+  Worker/
+```
+
 ## Main Components
 
 ### API
@@ -140,7 +158,7 @@ Planned next areas:
 - Broader unit test coverage
 - Broader API integration test coverage
 - Testcontainers
-- Better separation between API, application logic, infrastructure, and worker concerns
+- Continue refining API, application, domain, infrastructure, and worker boundaries
 - Docker and Docker Compose
 - GitHub Actions CI
 - PostgreSQL
@@ -153,7 +171,7 @@ Planned next areas:
 This project is still evolving. Some known limitations are:
 
 - The create and get job endpoints still access `AppDbContext` directly; manual retry is handled by a dedicated application-style service.
-- API and worker currently run in the same project and process.
+- API and worker currently run in the same project and process, with folders separating API, application use cases, domain job rules, infrastructure, options, and worker pipeline code.
 - `JobWorker` still orchestrates the polling loop and scoped worker services; recovery, claiming, and processing are handled by dedicated services.
 - Test coverage currently includes state transitions, DTO mapping, retry policy, execution result handling, stuck job recovery, job claiming, database-backed manual retry service tests, and Jobs API integration tests.
 - Docker, CI/CD, authentication, and production observability are not implemented yet.

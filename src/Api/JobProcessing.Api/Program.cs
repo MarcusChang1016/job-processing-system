@@ -1,7 +1,7 @@
 using JobProcessing.Api.Infrastructure;
-using JobProcessing.Api.Jobs;
-using JobProcessing.Api.Models;
-using JobProcessing.Api.Services;
+using JobProcessing.Api.Application.Jobs;
+using JobProcessing.Api.Options;
+using JobProcessing.Api.Worker;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);

@@ -1,7 +1,7 @@
 using FluentAssertions;
-using JobProcessing.Api.Enums;
+using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure.Entities;
-using JobProcessing.Api.Jobs;
+using JobProcessing.Api.Application.Jobs;
 using JobProcessing.Api.Tests.Infrastructure;
 
 namespace JobProcessing.Api.Tests;

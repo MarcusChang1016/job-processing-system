@@ -1,10 +1,10 @@
-using JobProcessing.Api.Enums;
+using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure;
-using JobProcessing.Api.Models;
+using JobProcessing.Api.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
-namespace JobProcessing.Api.Services;
+namespace JobProcessing.Api.Worker;
 
 public class JobRecoveryService
 {

@@ -1,4 +1,4 @@
-using JobProcessing.Api.Enums;
+using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure.Entities;
 
 namespace JobProcessing.Api.Contracts;

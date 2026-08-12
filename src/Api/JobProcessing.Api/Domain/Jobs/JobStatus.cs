@@ -1,4 +1,4 @@
-namespace JobProcessing.Api.Enums;
+namespace JobProcessing.Api.Domain.Jobs;
 
 public enum JobStatus
 {

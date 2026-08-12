@@ -1,8 +1,8 @@
 using JobProcessing.Api.Contracts;
-using JobProcessing.Api.Enums;
+using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure;
 using JobProcessing.Api.Infrastructure.Entities;
-using JobProcessing.Api.Jobs;
+using JobProcessing.Api.Application.Jobs;
 using Microsoft.AspNetCore.Mvc;
 
 namespace JobProcessing.Api.Controllers;
