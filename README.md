@@ -137,7 +137,7 @@ Failed
 
 ## Current Tech Stack
 
-- .NET 9
+- .NET 10
 - ASP.NET Core Web API
 - BackgroundService
 - EF Core
