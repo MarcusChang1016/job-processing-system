@@ -20,6 +20,7 @@ builder.Services.AddScoped<JobExecutionService>();
 builder.Services.AddScoped<JobRecoveryService>();
 builder.Services.AddScoped<JobClaimService>();
 builder.Services.AddScoped<JobProcessor>();
+builder.Services.AddScoped<CreateJobService>();
 builder.Services.AddScoped<ManualJobRetryService>();
 
 builder.Services.Configure<WorkerOptions>(builder.Configuration.GetSection("WorkerOptions"));

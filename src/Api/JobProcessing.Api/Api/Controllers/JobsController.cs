@@ -1,8 +1,6 @@
 using JobProcessing.Api.Application.Jobs;
 using JobProcessing.Api.Contracts;
-using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure;
-using JobProcessing.Api.Infrastructure.Entities;
 using Microsoft.AspNetCore.Mvc;
 
 namespace JobProcessing.Api.Controllers;
@@ -12,6 +10,7 @@ namespace JobProcessing.Api.Controllers;
 public class JobsController : ControllerBase
 {
     private readonly AppDbContext _dbContext;
+    private readonly CreateJobService _createJobService;
     private readonly ManualJobRetryService _manualJobRetryService;
 
     private static ProblemDetails InvalidJobStateProblem() =>
@@ -22,9 +21,14 @@ public class JobsController : ControllerBase
             Detail = "Only failed jobs can be retried.",
         };
 
-    public JobsController(AppDbContext dbContext, ManualJobRetryService manualJobRetryService)
+    public JobsController(
+        AppDbContext dbContext,
+        CreateJobService createJobService,
+        ManualJobRetryService manualJobRetryService
+    )
     {
         _dbContext = dbContext;
+        _createJobService = createJobService;
         _manualJobRetryService = manualJobRetryService;
     }
 
@@ -40,21 +44,15 @@ public class JobsController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreateJob()
+    public async Task<IActionResult> CreateJob(CancellationToken cancellationToken)
     {
-        var job = new JobEntity
-        {
-            Id = Guid.NewGuid(),
-            Status = JobStatus.Pending,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
-            RetryCount = 0,
-        };
+        var job = await _createJobService.CreateAsync(cancellationToken);
 
-        _dbContext.Jobs.Add(job);
-        await _dbContext.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetJob), new { id = job.Id }, JobResponse.FromEntity(job));
+        return CreatedAtAction(
+            nameof(GetJob),
+            new { id = job.Id },
+            JobResponse.FromJobDetails(job)
+        );
     }
 
     [HttpPost("{id}/retry")]

@@ -4,14 +4,15 @@
 
 The current system is an ASP.NET Core application that hosts both a Web API and a background worker in the same process.
 
-The API is responsible for accepting client requests and exposing job state. Job creation and reads currently use `AppDbContext` directly, while manual retry is delegated to `ManualJobRetryService`. The worker orchestrates polling, recovery, claiming, and execution by delegating recovery to `JobRecoveryService`, claiming to `JobClaimService`, processing to `JobProcessor`, execution to `JobExecutionService`, and failed-attempt decisions to `JobRetryPolicy`.
+The API is responsible for accepting client requests and exposing job state. Job creation is delegated to `CreateJobService`, reads currently use `AppDbContext` directly, and manual retry is delegated to `ManualJobRetryService`. The worker orchestrates polling, recovery, claiming, and execution by delegating recovery to `JobRecoveryService`, claiming to `JobClaimService`, processing to `JobProcessor`, execution to `JobExecutionService`, and failed-attempt decisions to `JobRetryPolicy`.
 
 The current architecture is intentionally simple:
 
 ```text
 Client
   -> ASP.NET Core API
-       -> Create/Get endpoints -> AppDbContext
+       -> Create endpoint -> CreateJobService -> AppDbContext
+       -> Get endpoint -> AppDbContext
        -> Retry endpoint -> ManualJobRetryService -> AppDbContext
 
 BackgroundService worker
@@ -87,7 +88,7 @@ Current endpoints:
 - `GET /metrics`
 - `GET /health`
 
-The create and get endpoints currently depend directly on `AppDbContext`. The manual retry endpoint delegates its use-case rules and persistence to `ManualJobRetryService`, while the controller remains responsible for mapping outcomes to HTTP status codes, `ProblemDetails`, and response DTOs.
+The create endpoint delegates initial-state rules and persistence to `CreateJobService`. The get endpoint currently depends directly on `AppDbContext`. The manual retry endpoint delegates its use-case rules and persistence to `ManualJobRetryService`, while the controller remains responsible for mapping application results to HTTP responses.
 
 Future improvement:
 
@@ -422,7 +423,7 @@ Future observability improvements may include:
 
 The current architecture intentionally keeps some trade-offs visible:
 
-- The create and get job endpoints still access `AppDbContext` directly; manual retry now uses a dedicated application-style service.
+- The get job endpoint still accesses `AppDbContext` directly; creation and manual retry use dedicated application-style services.
 - API and worker run in the same project and process.
 - `JobWorker` still orchestrates the polling loop and scoped worker services, but worker code is now grouped under `Worker/`.
 - `JobExecutionService` uses `TimeProvider` for execution timestamps, but randomness and delay are still not abstracted.
