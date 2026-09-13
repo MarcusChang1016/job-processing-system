@@ -1,6 +1,5 @@
 using JobProcessing.Api.Application.Jobs;
 using JobProcessing.Api.Contracts;
-using JobProcessing.Api.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 
 namespace JobProcessing.Api.Controllers;
@@ -9,7 +8,7 @@ namespace JobProcessing.Api.Controllers;
 [Route("jobs")]
 public class JobsController : ControllerBase
 {
-    private readonly AppDbContext _dbContext;
+    private readonly GetJobService _getJobService;
     private readonly CreateJobService _createJobService;
     private readonly ManualJobRetryService _manualJobRetryService;
 
@@ -22,25 +21,22 @@ public class JobsController : ControllerBase
         };
 
     public JobsController(
-        AppDbContext dbContext,
+        GetJobService getJobService,
         CreateJobService createJobService,
         ManualJobRetryService manualJobRetryService
     )
     {
-        _dbContext = dbContext;
+        _getJobService = getJobService;
         _createJobService = createJobService;
         _manualJobRetryService = manualJobRetryService;
     }
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetJob(Guid id)
+    public async Task<IActionResult> GetJob(Guid id, CancellationToken cancellationToken)
     {
-        var job = await _dbContext.Jobs.FindAsync(id);
+        var job = await _getJobService.GetAsync(id, cancellationToken);
 
-        if (job == null)
-            return NotFound();
-
-        return Ok(JobResponse.FromEntity(job));
+        return job is null ? NotFound() : Ok(JobResponse.FromJobDetails(job));
     }
 
     [HttpPost]

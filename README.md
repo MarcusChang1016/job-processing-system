@@ -27,7 +27,7 @@ The current system runs the API and worker in the same ASP.NET Core process.
 Client
   -> ASP.NET Core API
        -> Create endpoint -> CreateJobService -> AppDbContext
-       -> Get endpoint -> AppDbContext
+       -> Get endpoint -> GetJobService -> AppDbContext
        -> Retry endpoint -> ManualJobRetryService -> AppDbContext
 
 BackgroundService worker
@@ -119,6 +119,8 @@ The system currently includes several reliability concepts:
 
 `ManualJobRetryService` owns the separate client-initiated retry use case. It only accepts jobs already in `Failed`, returns them to `Pending`, resets their automatic retry budget, and clears previous execution state. `JobsController` maps the service outcome to the HTTP response without owning those business rules.
 
+`GetJobService` owns the job lookup use case. It performs a no-tracking database query and returns an application-level `JobDetails` result, so `JobsController` does not depend on EF Core entities or persistence details.
+
 These are intentionally implemented in a simple form first, so they can be tested and improved later.
 
 ## Job Lifecycle
@@ -171,10 +173,9 @@ Planned next areas:
 
 This project is still evolving. Some known limitations are:
 
-- The get job endpoint still accesses `AppDbContext` directly; creation and manual retry use dedicated application-style services.
 - API and worker currently run in the same project and process, with folders separating API, application use cases, domain job rules, infrastructure, options, and worker pipeline code.
 - `JobWorker` still orchestrates the polling loop and scoped worker services; recovery, claiming, and processing are handled by dedicated services.
-- Test coverage currently includes state transitions, DTO mapping, retry policy, execution result handling, stuck job recovery, job claiming, database-backed manual retry service tests, and Jobs API integration tests.
+- Test coverage currently includes state transitions, DTO mapping, retry policy, execution result handling, stuck job recovery, job claiming, database-backed create, read, and manual retry service tests, and Jobs API integration tests.
 - Docker, CI/CD, authentication, and production observability are not implemented yet.
 
 These limitations are intentional learning opportunities and will guide future refactoring.

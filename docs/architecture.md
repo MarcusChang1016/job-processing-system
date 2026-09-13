@@ -4,7 +4,7 @@
 
 The current system is an ASP.NET Core application that hosts both a Web API and a background worker in the same process.
 
-The API is responsible for accepting client requests and exposing job state. Job creation is delegated to `CreateJobService`, reads currently use `AppDbContext` directly, and manual retry is delegated to `ManualJobRetryService`. The worker orchestrates polling, recovery, claiming, and execution by delegating recovery to `JobRecoveryService`, claiming to `JobClaimService`, processing to `JobProcessor`, execution to `JobExecutionService`, and failed-attempt decisions to `JobRetryPolicy`.
+The API is responsible for accepting client requests and exposing job state. Job creation is delegated to `CreateJobService`, reads are delegated to `GetJobService`, and manual retry is delegated to `ManualJobRetryService`. The worker orchestrates polling, recovery, claiming, and execution by delegating recovery to `JobRecoveryService`, claiming to `JobClaimService`, processing to `JobProcessor`, execution to `JobExecutionService`, and failed-attempt decisions to `JobRetryPolicy`.
 
 The current architecture is intentionally simple:
 
@@ -12,7 +12,7 @@ The current architecture is intentionally simple:
 Client
   -> ASP.NET Core API
        -> Create endpoint -> CreateJobService -> AppDbContext
-       -> Get endpoint -> AppDbContext
+       -> Get endpoint -> GetJobService -> AppDbContext
        -> Retry endpoint -> ManualJobRetryService -> AppDbContext
 
 BackgroundService worker
@@ -78,7 +78,7 @@ Responsibilities:
 - Return job status
 - Map manual retry outcomes to HTTP responses
 - Return basic metrics
-- Convert persisted entities into API response DTOs
+- Convert application-level job details into API response DTOs
 
 Current endpoints:
 
@@ -88,15 +88,34 @@ Current endpoints:
 - `GET /metrics`
 - `GET /health`
 
-The create endpoint delegates initial-state rules and persistence to `CreateJobService`. The get endpoint currently depends directly on `AppDbContext`. The manual retry endpoint delegates its use-case rules and persistence to `ManualJobRetryService`, while the controller remains responsible for mapping application results to HTTP responses.
+The create endpoint delegates initial-state rules and persistence to `CreateJobService`. The get endpoint delegates its no-tracking lookup to `GetJobService`. The manual retry endpoint delegates its use-case rules and persistence to `ManualJobRetryService`, while the controller remains responsible for mapping application results to HTTP responses.
 
-Future improvement:
+Current request flow:
 
 ```text
 Controller
   -> Application service
   -> DbContext
 ```
+
+### Job Reading
+
+Location:
+
+```text
+Application/Jobs/GetJobService.cs
+Application/Jobs/JobDetails.cs
+```
+
+Responsibilities:
+
+- Find the requested job by its identifier
+- Use a no-tracking query because the use case is read-only
+- Propagate request cancellation to the database query
+- Return `null` when the job does not exist
+- Return immutable application-level `JobDetails` without exposing `JobEntity`
+
+`GetJobService` keeps EF Core querying and persistence-model mapping out of `JobsController`. The controller only maps the application result to `200 OK` or `404 Not Found`, then converts successful `JobDetails` into `JobResponse`.
 
 ### Manual Job Retry
 
@@ -423,12 +442,11 @@ Future observability improvements may include:
 
 The current architecture intentionally keeps some trade-offs visible:
 
-- The get job endpoint still accesses `AppDbContext` directly; creation and manual retry use dedicated application-style services.
 - API and worker run in the same project and process.
 - `JobWorker` still orchestrates the polling loop and scoped worker services, but worker code is now grouped under `Worker/`.
 - `JobExecutionService` uses `TimeProvider` for execution timestamps, but randomness and delay are still not abstracted.
 - State transitions are not consistently enforced through `JobStateMachine`.
-- Test coverage includes state transitions, DTO mapping, retry policy behaviour, recovery, claiming, execution result handling, database-backed manual retry service tests, and Jobs API integration tests.
+- Test coverage includes state transitions, DTO mapping, retry policy behaviour, recovery, claiming, execution result handling, database-backed create, read, and manual retry service tests, and Jobs API integration tests.
 - `JobProcessor` is intentionally thin and currently has limited direct test coverage because `JobExecutionService` is still concrete and simulation-heavy.
 
 These limitations are not failures. They are useful learning points and provide a clear path for future refactoring.
