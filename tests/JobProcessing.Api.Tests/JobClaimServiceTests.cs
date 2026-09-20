@@ -3,16 +3,22 @@ using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure;
 using JobProcessing.Api.Infrastructure.Entities;
 using JobProcessing.Api.Options;
+using JobProcessing.Api.Tests.Infrastructure;
 using JobProcessing.Api.Worker;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 
 namespace JobProcessing.Api.Tests;
 
-public class JobClaimServiceTests
+public class JobClaimServiceTests : IClassFixture<PostgreSqlFixture>
 {
+    private readonly PostgreSqlFixture _postgres;
+
+    public JobClaimServiceTests(PostgreSqlFixture postgres)
+    {
+        _postgres = postgres;
+    }
+
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
@@ -32,14 +38,11 @@ public class JobClaimServiceTests
             }
         );
 
-        // Build test-only database
-        await using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-
-        var dbOptions = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
-
-        await using var dbContext = new AppDbContext(dbOptions);
-        await dbContext.Database.EnsureCreatedAsync();
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(_postgres.ConnectionString)
+            .Options;
+        await using var dbContext = new AppDbContext(options);
+        await dbContext.Database.MigrateAsync();
 
         var oldestEligibleJobId = Guid.NewGuid();
         var newerEligibleJobId = Guid.NewGuid();

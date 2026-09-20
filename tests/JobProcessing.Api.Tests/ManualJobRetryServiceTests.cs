@@ -1,13 +1,22 @@
 using FluentAssertions;
 using JobProcessing.Api.Application.Jobs;
 using JobProcessing.Api.Domain.Jobs;
+using JobProcessing.Api.Infrastructure;
 using JobProcessing.Api.Infrastructure.Entities;
 using JobProcessing.Api.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
 namespace JobProcessing.Api.Tests;
 
-public class ManualJobRetryServiceTests
+public class ManualJobRetryServiceTests : IClassFixture<PostgreSqlFixture>
 {
+    private readonly PostgreSqlFixture _postgres;
+
+    public ManualJobRetryServiceTests(PostgreSqlFixture postgres)
+    {
+        _postgres = postgres;
+    }
+
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
@@ -18,8 +27,12 @@ public class ManualJobRetryServiceTests
     {
         var now = new DateTimeOffset(2026, 08, 05, 23, 0, 0, TimeSpan.Zero);
 
-        await using var database = await SqliteTestDatabase.CreateAsync();
-        var dbContext = database.DbContext;
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(_postgres.ConnectionString)
+            .Options;
+
+        await using var dbContext = new AppDbContext(options);
+        await dbContext.Database.MigrateAsync();
 
         var service = new ManualJobRetryService(dbContext, new FixedTimeProvider(now));
         var result = await service.RetryAsync(Guid.NewGuid(), CancellationToken.None);
@@ -38,8 +51,12 @@ public class ManualJobRetryServiceTests
     {
         var now = new DateTimeOffset(2026, 08, 05, 23, 0, 0, TimeSpan.Zero);
 
-        await using var database = await SqliteTestDatabase.CreateAsync();
-        var dbContext = database.DbContext;
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(_postgres.ConnectionString)
+            .Options;
+
+        await using var dbContext = new AppDbContext(options);
+        await dbContext.Database.MigrateAsync();
 
         var service = new ManualJobRetryService(dbContext, new FixedTimeProvider(now));
 
@@ -80,8 +97,12 @@ public class ManualJobRetryServiceTests
     {
         var now = new DateTimeOffset(2026, 08, 10, 22, 0, 0, TimeSpan.Zero);
 
-        await using var database = await SqliteTestDatabase.CreateAsync();
-        var dbContext = database.DbContext;
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(_postgres.ConnectionString)
+            .Options;
+
+        await using var dbContext = new AppDbContext(options);
+        await dbContext.Database.MigrateAsync();
 
         var service = new ManualJobRetryService(dbContext, new FixedTimeProvider(now));
 

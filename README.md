@@ -1,6 +1,6 @@
 # Job Processing System
 
-A backend learning project built with ASP.NET Core, EF Core, SQLite, and a hosted background worker.
+A backend learning project built with ASP.NET Core, EF Core, PostgreSQL, and a hosted background worker.
 
 The goal of this project is to practice and demonstrate backend engineering concepts through a small but realistic job processing system. It is intentionally being built step by step, so the codebase can show both working features and future architectural improvements.
 
@@ -38,7 +38,7 @@ BackgroundService worker
   -> JobExecutionResultHandler
   -> JobRetryPolicy for failed attempts
 
-AppDbContext -> EF Core / SQLite
+AppDbContext -> EF Core / PostgreSQL
 ```
 
 This is currently a single-project modular monolith. It is not yet a full Clean Architecture solution, but it is structured so the project can evolve toward clearer application, infrastructure, and worker boundaries.
@@ -87,7 +87,7 @@ Its responsibilities are:
 
 ### Persistence
 
-The project currently uses EF Core with SQLite.
+The project uses EF Core with PostgreSQL. Local development runs PostgreSQL through Docker Compose, while database-backed tests use disposable PostgreSQL containers through Testcontainers.
 
 Persistence responsibilities include:
 
@@ -96,7 +96,8 @@ Persistence responsibilities include:
 - Tracking processing timestamps
 - Tracking completion timestamps
 - Supporting migrations
-- Experimenting with optimistic concurrency through `RowVersion`
+- Detecting optimistic concurrency conflicts through PostgreSQL's `xmin` system column
+- Recreating a clean database from PostgreSQL-specific EF Core migrations
 
 ### Reliability
 
@@ -144,13 +145,51 @@ Failed
 - ASP.NET Core Web API
 - BackgroundService
 - EF Core
-- SQLite
+- PostgreSQL
+- Docker Compose for the local database
+- Testcontainers for database-backed tests
 - Swagger / OpenAPI
 - Health Checks
 - Structured logging
 - xUnit
 - FluentAssertions
 - TimeProvider
+
+## Local Development
+
+Docker is required for both the local PostgreSQL database and database-backed tests.
+
+Create the local Compose environment file, set a development-only password, and start PostgreSQL:
+
+```bash
+cp .env.example .env
+docker compose up -d
+docker compose ps
+```
+
+The `.env` file configures Docker Compose; ASP.NET Core does not load it automatically. Before starting the API, expose a connection string that uses the same password:
+
+```bash
+read -rsp "PostgreSQL password: " JOB_PROCESSING_DB_PASSWORD && echo
+export ConnectionStrings__JobProcessing="Host=localhost;Port=5432;Database=job_processing;Username=job_processing;Password=${JOB_PROCESSING_DB_PASSWORD}"
+unset JOB_PROCESSING_DB_PASSWORD
+
+dotnet run --project src/Api/JobProcessing.Api/JobProcessing.Api.csproj
+```
+
+When the API is stopped, remove the connection string from the current shell:
+
+```bash
+unset ConnectionStrings__JobProcessing
+```
+
+Run the test suite while Docker is available:
+
+```bash
+dotnet test tests/JobProcessing.Api.Tests/JobProcessing.Api.Tests.csproj
+```
+
+Database-backed tests create disposable PostgreSQL containers with Testcontainers; they do not use the local `job_processing` database.
 
 ## Learning Roadmap
 
@@ -160,11 +199,11 @@ Planned next areas:
 
 - Broader unit test coverage
 - Broader API integration test coverage
-- Testcontainers
+- A dedicated concurrency integration test with competing workers
+- Atomic job claiming when current optimistic claiming becomes insufficient
 - Continue refining API, application, domain, infrastructure, and worker boundaries
-- Docker and Docker Compose
+- Containerising the application
 - GitHub Actions CI
-- PostgreSQL
 - JWT authentication and authorisation
 - OpenTelemetry, Prometheus, and Grafana
 - Cloud deployment
@@ -176,7 +215,8 @@ This project is still evolving. Some known limitations are:
 - API and worker currently run in the same project and process, with folders separating API, application use cases, domain job rules, infrastructure, options, and worker pipeline code.
 - `JobWorker` still orchestrates the polling loop and scoped worker services; recovery, claiming, and processing are handled by dedicated services.
 - Test coverage currently includes state transitions, DTO mapping, retry policy, execution result handling, stuck job recovery, job claiming, database-backed create, read, and manual retry service tests, and Jobs API integration tests.
-- Docker, CI/CD, authentication, and production observability are not implemented yet.
+- The application itself is not containerised yet; Docker Compose currently provides PostgreSQL only.
+- CI/CD, authentication, and production observability are not implemented yet.
 
 These limitations are intentional learning opportunities and will guide future refactoring.
 

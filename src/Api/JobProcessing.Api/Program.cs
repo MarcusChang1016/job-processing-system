@@ -29,7 +29,20 @@ builder.Services.Configure<WorkerOptions>(builder.Configuration.GetSection("Work
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite("Data Source=jobs.db"));
+builder.Services.AddDbContext<AppDbContext>(
+    (serviceProvider, options) =>
+    {
+        var connectionString =
+            serviceProvider
+                .GetRequiredService<IConfiguration>()
+                .GetConnectionString("JobProcessing")
+            ?? throw new InvalidOperationException(
+                "ConnectionStrings: JobProcessing is not configured"
+            );
+
+        options.UseNpgsql(connectionString);
+    }
+);
 
 builder.Services.AddHealthChecks();
 

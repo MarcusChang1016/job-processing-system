@@ -23,7 +23,7 @@ BackgroundService worker
   -> JobExecutionResultHandler
   -> JobRetryPolicy
 
-AppDbContext -> EF Core / SQLite
+AppDbContext -> EF Core / PostgreSQL
 ```
 
 This is currently a single-project modular monolith. It is not yet a full Clean Architecture implementation, but it provides a practical foundation for learning backend architecture, background processing, reliability, persistence, and testing.
@@ -303,9 +303,11 @@ Responsibilities:
 - Store completion timestamps
 - Store failure information
 - Support migrations
-- Experiment with optimistic concurrency using `RowVersion`
+- Detect optimistic concurrency conflicts through PostgreSQL's `xmin` system column
 
-The current database provider is SQLite.
+The current database provider is PostgreSQL through the Npgsql EF Core provider. Local development uses the PostgreSQL service in Docker Compose. Database-backed service and API tests use PostgreSQL Testcontainers so provider-specific mappings, migrations, and concurrency behaviour match production.
+
+The original SQLite migration history was replaced with a clean PostgreSQL initial migration because the project had no production or shared data to preserve. Future schema changes should be added incrementally to this PostgreSQL migration history rather than resetting it.
 
 ### Domain-Like Rules
 
@@ -409,14 +411,14 @@ Manual retry is handled separately by `ManualJobRetryService`:
 
 ## Concurrency
 
-The system includes an optimistic concurrency concept using `RowVersion`.
+The system uses optimistic concurrency through PostgreSQL's hidden `xmin` system column. `JobEntity.Version` is a `uint` concurrency token mapped by Npgsql to `xmin`, which PostgreSQL changes whenever the row is updated.
 
-`JobClaimService` attempts to save a job after marking it as `Processing`. If another worker has already claimed the same job, EF Core can raise a concurrency exception and the worker skips that job.
+`JobClaimService` attempts to save a job after marking it as `Processing`. EF Core includes the originally read `xmin` value in the update condition. If another worker has already updated the same row, no row is affected, EF Core raises `DbUpdateConcurrencyException`, and the worker skips that job.
 
-This is an early concurrency model. It is useful for learning, but future work may include:
+This detects competing updates but does not make selecting and claiming a job one atomic database operation. Future work may include:
 
+- An integration test with two workers competing for the same job
 - Atomic claim query
-- Better provider-specific concurrency handling
 - Multiple workers
 - Distributed locking if truly needed
 

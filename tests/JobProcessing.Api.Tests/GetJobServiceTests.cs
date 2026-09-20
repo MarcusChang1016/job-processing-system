@@ -1,18 +1,32 @@
 using FluentAssertions;
 using JobProcessing.Api.Application.Jobs;
 using JobProcessing.Api.Domain.Jobs;
+using JobProcessing.Api.Infrastructure;
 using JobProcessing.Api.Infrastructure.Entities;
 using JobProcessing.Api.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
 namespace JobProcessing.Api.Tests;
 
-public class GetJobServiceTests
+public class GetJobServiceTests : IClassFixture<PostgreSqlFixture>
 {
+    private readonly PostgreSqlFixture _postgres;
+
+    public GetJobServiceTests(PostgreSqlFixture postgres)
+    {
+        _postgres = postgres;
+    }
+
     [Fact]
     public async Task GetAsync_WhenJobDoesNotExist_ReturnsNull()
     {
-        await using var database = await SqliteTestDatabase.CreateAsync();
-        var service = new GetJobService(database.DbContext);
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(_postgres.ConnectionString)
+            .Options;
+        await using var dbContext = new AppDbContext(options);
+        await dbContext.Database.MigrateAsync();
+
+        var service = new GetJobService(dbContext);
 
         var result = await service.GetAsync(Guid.NewGuid(), CancellationToken.None);
 
@@ -22,7 +36,11 @@ public class GetJobServiceTests
     [Fact]
     public async Task GetAsync_WhenJobExists_ReturnsJobDetails()
     {
-        await using var database = await SqliteTestDatabase.CreateAsync();
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(_postgres.ConnectionString)
+            .Options;
+        await using var dbContext = new AppDbContext(options);
+        await dbContext.Database.MigrateAsync();
 
         var job = new JobEntity
         {
@@ -34,11 +52,11 @@ public class GetJobServiceTests
             CompletedAtUtc = null,
         };
 
-        database.DbContext.Jobs.Add(job);
-        await database.DbContext.SaveChangesAsync();
-        database.DbContext.ChangeTracker.Clear();
+        dbContext.Jobs.Add(job);
+        await dbContext.SaveChangesAsync();
+        dbContext.ChangeTracker.Clear();
 
-        var service = new GetJobService(database.DbContext);
+        var service = new GetJobService(dbContext);
 
         var result = await service.GetAsync(job.Id, CancellationToken.None);
 

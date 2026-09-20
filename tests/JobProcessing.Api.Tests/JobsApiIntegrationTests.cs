@@ -5,17 +5,25 @@ using JobProcessing.Api.Contracts;
 using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure;
 using JobProcessing.Api.Infrastructure.Entities;
+using JobProcessing.Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JobProcessing.Api.Tests;
 
-public class JobsApiIntegrationTests
+public class JobsApiIntegrationTests : IClassFixture<PostgreSqlFixture>
 {
+    private readonly PostgreSqlFixture _postgres;
+
+    public JobsApiIntegrationTests(PostgreSqlFixture postgres)
+    {
+        _postgres = postgres;
+    }
+
     [Fact]
     public async Task CreateJob_ReturnsCreatedJob()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using var factory = new CustomWebApplicationFactory(_postgres.ConnectionString);
         var client = factory.CreateClient();
 
         var response = await client.PostAsync("/jobs", content: null);
@@ -33,7 +41,7 @@ public class JobsApiIntegrationTests
     [Fact]
     public async Task CreateJob_ReturnsLocationThatCanBeUsedToGetJob()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using var factory = new CustomWebApplicationFactory(_postgres.ConnectionString);
         var client = factory.CreateClient();
 
         var createResponse = await client.PostAsync("/jobs", content: null);
@@ -57,7 +65,7 @@ public class JobsApiIntegrationTests
     [Fact]
     public async Task GetJob_WhenJobDoesNotExist_ReturnsNotFound()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using var factory = new CustomWebApplicationFactory(_postgres.ConnectionString);
         var client = factory.CreateClient();
 
         var response = await client.GetAsync($"/jobs/{Guid.NewGuid()}");
@@ -68,7 +76,7 @@ public class JobsApiIntegrationTests
     [Fact]
     public async Task RetryJob_WhenJobDoesNotExist_ReturnsNotFound()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using var factory = new CustomWebApplicationFactory(_postgres.ConnectionString);
         var client = factory.CreateClient();
 
         var response = await client.PostAsync($"/jobs/{Guid.NewGuid()}/retry", content: null);
@@ -79,7 +87,7 @@ public class JobsApiIntegrationTests
     [Fact]
     public async Task RetryJob_WhenJobIsNotFailed_ReturnsBadRequest()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using var factory = new CustomWebApplicationFactory(_postgres.ConnectionString);
         var client = factory.CreateClient();
 
         var jobId = Guid.NewGuid();
@@ -111,7 +119,7 @@ public class JobsApiIntegrationTests
     [Fact]
     public async Task RetryJob_WhenJobIsFailed_ReturnsRetriedJobAndClearsRetryState()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using var factory = new CustomWebApplicationFactory(_postgres.ConnectionString);
         var client = factory.CreateClient();
 
         var jobId = Guid.NewGuid();

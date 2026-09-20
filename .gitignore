@@ -52,7 +52,6 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
-src/Api/JobProcessing.Api/jobs.db
 AGENTS.md
 
 .env

@@ -8,7 +8,7 @@ This document describes how a job moves through the system from creation to comp
 Client
   -> POST /jobs
   -> API creates a `Pending` job
-  -> EF Core saves the job to SQLite
+  -> EF Core saves the job to PostgreSQL
 
 Background worker
   -> calls `JobRecoveryService` to recover stale `Processing` jobs
@@ -37,7 +37,7 @@ The API creates a new job with:
 - `UpdatedAtUtc`
 - `RetryCount = 0`
 
-The job is saved to SQLite through EF Core.
+The job is saved to PostgreSQL through EF Core.
 
 At this point, the job has not been processed yet. It is only waiting for the background worker.
 
@@ -250,7 +250,7 @@ Success
 
 - The system currently uses polling rather than a message queue.
 - The API and worker currently run in the same process.
-- Job state is persisted in SQLite.
+- Job state is persisted in PostgreSQL.
 - Retry behaviour is time-based through `NextRetryAtUtc`.
 - Stuck job recovery protects against jobs remaining in `Processing` forever.
 - The current execution logic is simulated and intentionally simple.

@@ -21,5 +21,5 @@ public class JobEntity
     public string? LastErrorMessage { get; set; }
 
     [Timestamp]
-    public byte[]? RowVersion { get; set; }
+    public uint Version { get; set; }
 }
