@@ -7,6 +7,7 @@ using JobProcessing.Api.Tests.Infrastructure;
 using JobProcessing.Api.Worker;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using OptionsFactory = Microsoft.Extensions.Options.Options;
 
 namespace JobProcessing.Api.Tests;
 
@@ -29,7 +30,7 @@ public class JobClaimServiceTests : IClassFixture<PostgreSqlFixture>
     {
         var now = new DateTimeOffset(2026, 07, 09, 23, 0, 0, TimeSpan.Zero);
 
-        var workerOptions = Microsoft.Extensions.Options.Options.Create(
+        var workerOptions = OptionsFactory.Create(
             new WorkerOptions
             {
                 MaxRetryCount = 3,
@@ -43,6 +44,7 @@ public class JobClaimServiceTests : IClassFixture<PostgreSqlFixture>
             .Options;
         await using var dbContext = new AppDbContext(options);
         await dbContext.Database.MigrateAsync();
+        await dbContext.Jobs.ExecuteDeleteAsync();
 
         var oldestEligibleJobId = Guid.NewGuid();
         var newerEligibleJobId = Guid.NewGuid();
@@ -117,5 +119,60 @@ public class JobClaimServiceTests : IClassFixture<PostgreSqlFixture>
         jobs[newerEligibleJobId].ProcessingStartedAtUtc.Should().BeNull();
         jobs[futureRetryJobId].Status.Should().Be(JobStatus.Pending);
         jobs[maxRetryJobId].Status.Should().Be(JobStatus.Pending);
+    }
+
+    [Fact]
+    public async Task ClaimNextJobAsync_WhenTrackedJobWasUpdatedByAnotherContext_ReturnsNull()
+    {
+        var now = new DateTimeOffset(2026, 07, 09, 23, 0, 0, TimeSpan.Zero);
+        var competingUpdateTime = now.UtcDateTime.AddMinutes(-1);
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(_postgres.ConnectionString)
+            .Options;
+
+        var jobId = Guid.NewGuid();
+        await using (var setupContext = new AppDbContext(options))
+        {
+            await setupContext.Database.MigrateAsync();
+            await setupContext.Jobs.ExecuteDeleteAsync();
+            setupContext.Jobs.Add(
+                new JobEntity
+                {
+                    Id = jobId,
+                    Status = JobStatus.Pending,
+                    CreatedAtUtc = now.UtcDateTime.AddMinutes(-10),
+                    UpdatedAtUtc = now.UtcDateTime.AddMinutes(-10),
+                }
+            );
+            await setupContext.SaveChangesAsync();
+        }
+
+        await using var staleContext = new AppDbContext(options);
+        await staleContext.Jobs.SingleAsync(job => job.Id == jobId);
+
+        await using (var competingContext = new AppDbContext(options))
+        {
+            var competingJob = await competingContext.Jobs.SingleAsync(job => job.Id == jobId);
+            competingJob.UpdatedAtUtc = competingUpdateTime;
+            await competingContext.SaveChangesAsync();
+        }
+
+        var workerOptions = OptionsFactory.Create(new WorkerOptions { MaxRetryCount = 3 });
+        var service = new JobClaimService(
+            staleContext,
+            workerOptions,
+            new FixedTimeProvider(now),
+            NullLogger<JobClaimService>.Instance
+        );
+
+        var claimedJob = await service.ClaimNextJobAsync(CancellationToken.None);
+
+        claimedJob.Should().BeNull();
+
+        await using var verificationContext = new AppDbContext(options);
+        var persistedJob = await verificationContext.Jobs.SingleAsync(job => job.Id == jobId);
+        persistedJob.Status.Should().Be(JobStatus.Pending);
+        persistedJob.UpdatedAtUtc.Should().Be(competingUpdateTime);
+        persistedJob.ProcessingStartedAtUtc.Should().BeNull();
     }
 }
