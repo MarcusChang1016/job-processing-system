@@ -457,18 +457,10 @@ The current architecture intentionally keeps some trade-offs visible:
 - Test coverage includes state transitions, DTO mapping, retry policy behaviour, recovery, claiming, execution result handling, database-backed create, read, and manual retry service tests, and Jobs API integration tests.
 - `JobProcessor` is intentionally thin and currently has limited direct test coverage because `JobExecutionService` is still concrete and simulation-heavy.
 
-These limitations are not failures. They are useful learning points and provide a clear path for future refactoring.
+These trade-offs will be revisited when the next use case or operational evidence warrants a change.
 
 ## Architecture Direction
 
-The next architecture improvements should be driven by real learning value and testability, not by adding patterns for their own sake.
+The current priorities are to replace simulated execution with one real job, package and test the application in CI, make failures diagnosable, and deploy the system with a recovery exercise. The public milestones are listed in the [README](../README.md#roadmap).
 
-Direction:
-
-1. Continue expanding unit tests around job execution orchestration and worker behaviour.
-2. Improve testability around time, randomness, and execution simulation.
-3. Improve execution testability before extracting more worker responsibilities.
-4. Continue extracting focused application use cases when controller or worker responsibilities justify it.
-5. Split projects only when the boundaries are understood well enough to justify the extra structure.
-
-The goal is to grow toward cleaner architecture gradually while keeping the system understandable.
+Keep the modular monolith while its responsibilities remain clear. Add another abstraction, project, index, or infrastructure dependency when a measured or demonstrated problem calls for it. Execution testability will improve alongside the first real job type.

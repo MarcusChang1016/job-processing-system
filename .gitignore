@@ -55,3 +55,6 @@ nunit-*.xml
 AGENTS.md
 
 .env
+
+# Local learning notes (not part of the public project documentation)
+/docs/learning-map.md
