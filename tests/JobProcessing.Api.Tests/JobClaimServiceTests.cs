@@ -175,4 +175,62 @@ public class JobClaimServiceTests : IClassFixture<PostgreSqlFixture>
         persistedJob.UpdatedAtUtc.Should().Be(competingUpdateTime);
         persistedJob.ProcessingStartedAtUtc.Should().BeNull();
     }
+
+    [Fact]
+    public async Task ClaimNextJobAsync_WhenOldestEligibleJobIsLocked_ClaimsNextAvailableJob()
+    {
+        var now = new DateTimeOffset(2026, 07, 09, 23, 0, 0, TimeSpan.Zero);
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(_postgres.ConnectionString)
+            .Options;
+        var oldestJobId = Guid.NewGuid();
+        var nextJobId = Guid.NewGuid();
+
+        await using (var setupContext = new AppDbContext(options))
+        {
+            await setupContext.Database.MigrateAsync();
+            await setupContext.Jobs.ExecuteDeleteAsync();
+            setupContext.Jobs.AddRange(
+                CreatePendingJob(oldestJobId, now.UtcDateTime.AddMinutes(-10)),
+                CreatePendingJob(nextJobId, now.UtcDateTime.AddMinutes(-5))
+            );
+            await setupContext.SaveChangesAsync();
+        }
+
+        await using var lockingContext = new AppDbContext(options);
+        await using var lockingTransaction = await lockingContext.Database.BeginTransactionAsync();
+        await lockingContext
+            .Jobs.FromSqlInterpolated(
+                $"""
+                SELECT jobs.*, jobs.xmin
+                FROM "Jobs" AS jobs
+                WHERE jobs."Id" = {oldestJobId}
+                FOR UPDATE
+                """
+            )
+            .ToListAsync();
+
+        await using var claimingContext = new AppDbContext(options);
+        var service = new JobClaimService(
+            claimingContext,
+            OptionsFactory.Create(new WorkerOptions { MaxRetryCount = 3 }),
+            new FixedTimeProvider(now),
+            NullLogger<JobClaimService>.Instance
+        );
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+
+        var claimedJob = await service.ClaimNextJobAsync(cancellation.Token);
+
+        claimedJob.Should().NotBeNull();
+        claimedJob!.Id.Should().Be(nextJobId);
+    }
+
+    private static JobEntity CreatePendingJob(Guid id, DateTime createdAtUtc) =>
+        new()
+        {
+            Id = id,
+            Status = JobStatus.Pending,
+            CreatedAtUtc = createdAtUtc,
+            UpdatedAtUtc = createdAtUtc,
+        };
 }

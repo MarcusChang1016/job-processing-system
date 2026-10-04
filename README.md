@@ -108,7 +108,8 @@ The system currently includes several reliability concepts:
 - Maximum retry count
 - Stuck job timeout detection
 - Recovery from stale `Processing` state
-- Eligible job claiming through `JobClaimService`
+- Atomic eligible job claiming through PostgreSQL row locking
+- Locked-row skipping for multiple worker compatibility
 - Fail-fast execution behaviour
 - State transition validation
 - Claimed job processing through `JobProcessor`
@@ -199,8 +200,8 @@ Planned next areas:
 
 - Broader unit test coverage
 - Broader API integration test coverage
-- A dedicated concurrency integration test with competing workers
-- Atomic job claiming when current optimistic claiming becomes insufficient
+- Multiple-worker concurrency and throughput testing
+- Claim-query indexing when measurement shows it is needed
 - Continue refining API, application, domain, infrastructure, and worker boundaries
 - Containerising the application
 - GitHub Actions CI
@@ -214,7 +215,7 @@ This project is still evolving. Some known limitations are:
 
 - API and worker currently run in the same project and process, with folders separating API, application use cases, domain job rules, infrastructure, options, and worker pipeline code.
 - `JobWorker` still orchestrates the polling loop and scoped worker services; recovery, claiming, and processing are handled by dedicated services.
-- Test coverage currently includes state transitions, DTO mapping, retry policy, execution result handling, stuck job recovery, job claiming, database-backed create, read, and manual retry service tests, and Jobs API integration tests.
+- Test coverage currently includes state transitions, DTO mapping, retry policy, execution result handling, stuck job recovery, atomic job claiming and locked-row skipping, database-backed create, read, and manual retry service tests, and Jobs API integration tests.
 - The application itself is not containerised yet; Docker Compose currently provides PostgreSQL only.
 - CI/CD, authentication, and production observability are not implemented yet.
 
@@ -226,3 +227,4 @@ More detailed design notes live in the `docs` folder.
 
 - `docs/architecture.md` describes the system architecture and component responsibilities.
 - `docs/system_flow.md` describes the high-level job processing flow.
+- `docs/decisions.md` records significant engineering decisions and their trade-offs.

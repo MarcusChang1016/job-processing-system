@@ -166,7 +166,8 @@ The worker is now mostly an orchestrator that coordinates scoped services and sc
 
 Future improvement candidates:
 
-- Improve claim concurrency with an atomic claim operation
+- Measure the atomic claim query and add an index when justified
+- Exercise multiple worker instances under sustained contention
 - Extract real job handlers when execution is no longer simulated
 
 ### Job Recovery
@@ -200,6 +201,8 @@ Responsibilities:
 - Find the oldest eligible `Pending` job
 - Respect retry cooldown through `NextRetryAtUtc`
 - Ignore jobs that reached the maximum retry count
+- Select and lock the next job inside a database transaction
+- Skip rows already locked by another worker
 - Mark the claimed job as `Processing`
 - Set `ProcessingStartedAtUtc` and `UpdatedAtUtc`
 - Persist the claim attempt
@@ -411,16 +414,17 @@ Manual retry is handled separately by `ManualJobRetryService`:
 
 ## Concurrency
 
-The system uses optimistic concurrency through PostgreSQL's hidden `xmin` system column. `JobEntity.Version` is a `uint` concurrency token mapped by Npgsql to `xmin`, which PostgreSQL changes whenever the row is updated.
+The system combines PostgreSQL row locking with optimistic concurrency. `JobClaimService` starts a transaction and selects the oldest eligible job with `FOR UPDATE SKIP LOCKED`. A worker therefore skips jobs already locked by another worker and can claim the next available job instead of waiting or using an exception as its normal control flow.
 
-`JobClaimService` attempts to save a job after marking it as `Processing`. EF Core includes the originally read `xmin` value in the update condition. If another worker has already updated the same row, no row is affected, EF Core raises `DbUpdateConcurrencyException`, and the worker skips that job.
+The row lock is held until the claim update commits, making selection and state transition one transactional operation. The implementation uses parameterized raw SQL because EF Core LINQ does not express PostgreSQL's `SKIP LOCKED` clause.
 
-This detects competing updates but does not make selecting and claiming a job one atomic database operation. Future work may include:
+`JobEntity.Version` remains a `uint` concurrency token mapped by Npgsql to PostgreSQL's hidden `xmin` system column. It provides a second safety mechanism: if a tracked entity is stale, EF Core raises `DbUpdateConcurrencyException`, and the worker returns no claimed job.
 
-- An integration test with two workers competing for the same job
-- Atomic claim query
-- Multiple workers
-- Distributed locking if truly needed
+Future work may include:
+
+- Multiple worker throughput and contention testing
+- Query-plan measurement and an index for eligible-job selection when justified
+- A single-statement `UPDATE ... RETURNING` claim only if profiling demonstrates value
 
 ## Observability
 
@@ -447,6 +451,8 @@ The current architecture intentionally keeps some trade-offs visible:
 - API and worker run in the same project and process.
 - `JobWorker` still orchestrates the polling loop and scoped worker services, but worker code is now grouped under `Worker/`.
 - `JobExecutionService` uses `TimeProvider` for execution timestamps, but randomness and delay are still not abstracted.
+- Atomic claiming uses PostgreSQL-specific SQL and intentionally couples this persistence operation to PostgreSQL.
+- The eligible-job claim query has no dedicated index yet; one should be introduced from query-plan evidence rather than speculation.
 - State transitions are not consistently enforced through `JobStateMachine`.
 - Test coverage includes state transitions, DTO mapping, retry policy behaviour, recovery, claiming, execution result handling, database-backed create, read, and manual retry service tests, and Jobs API integration tests.
 - `JobProcessor` is intentionally thin and currently has limited direct test coverage because `JobExecutionService` is still concrete and simulation-heavy.

@@ -30,15 +30,28 @@ public class JobClaimService
     public async Task<JobEntity?> ClaimNextJobAsync(CancellationToken cancellationToken)
     {
         var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var pendingStatus = (int)JobStatus.Pending;
 
-        var job = await _dbContext
-            .Jobs.Where(job =>
-                job.Status == JobStatus.Pending
-                && (job.NextRetryAtUtc == null || job.NextRetryAtUtc <= now)
-                && (job.RetryCount < _options.MaxRetryCount)
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(
+            cancellationToken
+        );
+
+        var jobs = await _dbContext
+            .Jobs.FromSqlInterpolated(
+                $"""
+                SELECT jobs.*, jobs.xmin
+                FROM "Jobs" AS jobs
+                WHERE jobs."Status" = {pendingStatus}
+                  AND (jobs."NextRetryAtUtc" IS NULL OR jobs."NextRetryAtUtc" <= {now})
+                  AND jobs."RetryCount" < {_options.MaxRetryCount}
+                ORDER BY jobs."CreatedAtUtc"
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+                """
             )
-            .OrderBy(job => job.CreatedAtUtc)
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+
+        var job = jobs.SingleOrDefault();
 
         if (job != null)
         {
@@ -62,8 +75,8 @@ public class JobClaimService
 
             try
             {
-                _dbContext.Jobs.Update(job);
                 await _dbContext.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
                 return job;
             }
             catch (DbUpdateConcurrencyException)
@@ -73,6 +86,7 @@ public class JobClaimService
             }
         }
 
+        await transaction.CommitAsync(cancellationToken);
         return null;
     }
 }

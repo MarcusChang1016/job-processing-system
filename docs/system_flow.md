@@ -101,11 +101,11 @@ When it finds one, it attempts to claim it by setting:
 - `ProcessingStartedAtUtc = now`
 - `UpdatedAtUtc = now`
 
-`JobClaimService` then saves the claim attempt to the database.
+`JobClaimService` starts a database transaction and selects the job with `FOR UPDATE SKIP LOCKED`. The selected row remains locked while the service changes it to `Processing` and saves the claim.
 
-If another worker has already claimed the same job, EF Core may raise a concurrency exception. In that case, `JobClaimService` returns no claimed job and the worker waits for the next polling cycle.
+If another worker already holds a lock on the oldest eligible job, PostgreSQL skips that row so this worker can claim the next available job. The transaction commits only after the claim is persisted.
 
-This is an early optimistic concurrency model. It is useful for learning, but future versions may improve this with an atomic claim operation.
+PostgreSQL's `xmin` concurrency token remains an additional safety mechanism for stale tracked entities. If EF Core detects a stale update, `JobClaimService` returns no claimed job.
 
 ## 5. Job Execution
 
@@ -254,7 +254,7 @@ Success
 - Retry behaviour is time-based through `NextRetryAtUtc`.
 - Stuck job recovery protects against jobs remaining in `Processing` forever.
 - The current execution logic is simulated and intentionally simple.
-- Job claiming is handled by `JobClaimService`.
+- Atomic job claiming and locked-row skipping are handled by `JobClaimService`.
 - Claimed job processing and execution result persistence are handled by `JobProcessor`.
 - `JobExecutionService` uses `TimeProvider` for execution timestamps.
 - Success and failure reactions are handled by `JobExecutionResultHandler`.
