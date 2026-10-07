@@ -1,29 +1,27 @@
 using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure.Entities;
-using JobProcessing.Api.Options;
-using Microsoft.Extensions.Options;
+using JobProcessing.Api.Infrastructure.Weather;
 
 namespace JobProcessing.Api.Worker;
 
 public class JobExecutionService
 {
     private readonly ILogger<JobExecutionService> _logger;
-    private readonly WorkerOptions _workerOptions;
     private readonly JobExecutionResultHandler _jobExecutionResultHandler;
     private readonly TimeProvider _timeProvider;
-    private readonly Random _random = new();
+    private readonly BomWeatherClient _bomWeatherClient;
 
     public JobExecutionService(
         ILogger<JobExecutionService> logger,
-        IOptions<WorkerOptions> options,
         JobExecutionResultHandler jobExecutionResultHandler,
-        TimeProvider timeProvider
+        TimeProvider timeProvider,
+        BomWeatherClient bomWeatherClient
     )
     {
         _logger = logger;
-        _workerOptions = options.Value;
         _jobExecutionResultHandler = jobExecutionResultHandler;
         _timeProvider = timeProvider;
+        _bomWeatherClient = bomWeatherClient;
     }
 
     public async Task ExecuteAsync(JobEntity job, CancellationToken stoppingToken)
@@ -34,18 +32,17 @@ public class JobExecutionService
 
         try
         {
-            // Simulate processing time
-            await Task.Delay(_workerOptions.ProcessingDelaySeconds * 1000, stoppingToken);
+            var observation = await _bomWeatherClient.GetLatestAsync(stoppingToken);
 
-            // Simulate random failure / success
-            bool isFailed = _random.Next(0, 2) == 0; // 50% chance of failure
-
-            if (isFailed)
-                throw new Exception("Simulated failure");
+            _logger.LogInformation(
+                "Fetched BOM observation at {ObservedAtUtc}: {AirTemperatureCelsius} C",
+                observation.ObservedAtUtc,
+                observation.AirTemperatureCelsius
+            );
 
             var finishedAt = _timeProvider.GetUtcNow().UtcDateTime;
 
-            _jobExecutionResultHandler.ApplySuccess(job, finishedAt);
+            _jobExecutionResultHandler.ApplySuccess(job, observation, finishedAt);
 
             _logger.LogInformation("Job {id} completed successfully", job.Id);
             _logger.LogInformation(
@@ -60,7 +57,7 @@ public class JobExecutionService
                 }
             );
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !stoppingToken.IsCancellationRequested)
         {
             var finishedAt = _timeProvider.GetUtcNow().UtcDateTime;
 

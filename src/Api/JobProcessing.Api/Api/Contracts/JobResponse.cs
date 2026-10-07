@@ -12,6 +12,8 @@ public record JobResponse
     public int RetryCount { get; init; }
     public DateTime? CompletedAt { get; init; }
     public string? FailureReason { get; init; }
+    public DateTime? WeatherObservedAtUtc { get; init; }
+    public double? AirTemperatureCelsius { get; init; }
 
     public static JobResponse FromJobDetails(JobDetails job) =>
         new()
@@ -24,5 +26,7 @@ public record JobResponse
             CompletedAt = job.CompletedAtUtc,
             FailureReason =
                 job.Status == JobStatus.Failed ? "Job failed after maximum retries." : null,
+            WeatherObservedAtUtc = job.WeatherObservedAtUtc,
+            AirTemperatureCelsius = job.AirTemperatureCelsius,
         };
 }

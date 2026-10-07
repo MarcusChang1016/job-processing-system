@@ -20,6 +20,7 @@ BackgroundService worker
   -> JobClaimService
   -> JobProcessor
   -> JobExecutionService
+  -> BomWeatherClient -> public BOM API
   -> JobExecutionResultHandler
   -> JobRetryPolicy
 
@@ -37,11 +38,13 @@ src/Api/JobProcessing.Api
     Contracts/
   Application/
     Jobs/
+    Weather/
   Domain/
     Jobs/
   Infrastructure/
     Entities/
     Migrations/
+    Weather/
   Options/
   Worker/
 ```
@@ -114,6 +117,7 @@ Responsibilities:
 - Propagate request cancellation to the database query
 - Return `null` when the job does not exist
 - Return immutable application-level `JobDetails` without exposing `JobEntity`
+- Include the stored BOM observation time and air temperature when available
 
 `GetJobService` keeps EF Core querying and persistence-model mapping out of `JobsController`. The controller only maps the application result to `200 OK` or `404 Not Found`, then converts successful `JobDetails` into `JobResponse`.
 
@@ -168,7 +172,7 @@ Future improvement candidates:
 
 - Measure the atomic claim query and add an index when justified
 - Exercise multiple worker instances under sustained contention
-- Extract real job handlers when execution is no longer simulated
+- Introduce distinct job handlers only if a second job type creates a real need
 
 ### Job Recovery
 
@@ -238,14 +242,19 @@ Worker/JobExecutionService.cs
 Responsibilities:
 
 - Orchestrate one job execution attempt
-- Simulate job processing time
-- Simulate success or failure
+- Fetch the latest Brisbane BOM weather observation through `BomWeatherClient`
+- Treat fetch and parsing errors as failed attempts under the existing retry policy
+- Propagate worker shutdown cancellation without counting it as a failed attempt
 - Delegate success and failure reactions to `JobExecutionResultHandler`
 - Emit structured job result logs
 
 `JobExecutionService` no longer owns retry decisions or direct success/failure state mutation. It coordinates the execution flow and delegates result handling to `JobExecutionResultHandler`.
 
-It still owns simulated randomness, delay, logging, and `TimeProvider` usage. These are future testability improvement points.
+`BomWeatherClient` uses a typed `HttpClient` with a ten-second timeout, checks the
+HTTP status, and maps the BOM JSON into a `WeatherObservation`. Missing or invalid
+required observation data fails the attempt. The job takes no client input and
+currently supports only this fixed observation. The HTTP client and mapper can be
+tested without a live BOM request.
 
 ### Job Execution Result Handler
 
@@ -261,6 +270,7 @@ Responsibilities:
 - Mark successful jobs as `Success`
 - Set `UpdatedAtUtc` and `CompletedAtUtc`
 - Clear previous failure messages after success
+- Store the observation's UTC time and air temperature after success
 - Delegate failure handling to `JobRetryPolicy`
 
 This handler exists so `JobExecutionService` does not need to know the details of how job state changes after success or failure.
@@ -305,6 +315,7 @@ Responsibilities:
 - Store processing timestamps
 - Store completion timestamps
 - Store failure information
+- Store nullable BOM observation time and air temperature as this job's result
 - Support migrations
 - Detect optimistic concurrency conflicts through PostgreSQL's `xmin` system column
 
@@ -450,17 +461,27 @@ The current architecture intentionally keeps some trade-offs visible:
 
 - API and worker run in the same project and process.
 - `JobWorker` still orchestrates the polling loop and scoped worker services, but worker code is now grouped under `Worker/`.
-- `JobExecutionService` uses `TimeProvider` for execution timestamps, but randomness and delay are still not abstracted.
+- `JobExecutionService` uses `TimeProvider` for execution timestamps and remains
+  coupled to the one fixed BOM job type.
+- The fixed BOM job depends on an external public API; HTTP failures, invalid data,
+  and timeouts can delay completion or exhaust retries.
+- Weather result columns live on `JobEntity` because there is only one job type;
+  adding more types may justify a different result model.
 - Atomic claiming uses PostgreSQL-specific SQL and intentionally couples this persistence operation to PostgreSQL.
 - The eligible-job claim query has no dedicated index yet; one should be introduced from query-plan evidence rather than speculation.
 - State transitions are not consistently enforced through `JobStateMachine`.
-- Test coverage includes state transitions, DTO mapping, retry policy behaviour, recovery, claiming, execution result handling, database-backed create, read, and manual retry service tests, and Jobs API integration tests.
-- `JobProcessor` is intentionally thin and currently has limited direct test coverage because `JobExecutionService` is still concrete and simulation-heavy.
+- Test coverage includes state transitions, DTO mapping, retry policy behaviour, recovery, claiming, BOM mapping/client/execution behaviour, execution result handling, database-backed create, read, and manual retry service tests, and Jobs API integration tests.
+- `JobProcessor` is intentionally thin and currently has limited direct test coverage; the HTTP-backed execution service is tested with fake HTTP responses.
 
 These trade-offs will be revisited when the next use case or operational evidence warrants a change.
 
 ## Architecture Direction
 
-The current priorities are to replace simulated execution with one real job, package and test the application in CI, make failures diagnosable, and deploy the system with a recovery exercise. The public milestones are listed in the [README](../README.md#roadmap).
+The fixed BOM job now replaces simulated execution. The next priorities are to
+package and test the application in CI, make failures diagnosable, and deploy the
+system with a recovery exercise. The public milestones are listed in the
+[README](../README.md#roadmap).
 
-Keep the modular monolith while its responsibilities remain clear. Add another abstraction, project, index, or infrastructure dependency when a measured or demonstrated problem calls for it. Execution testability will improve alongside the first real job type.
+Keep the modular monolith while its responsibilities remain clear. Add another
+abstraction, project, index, or infrastructure dependency when a measured or
+demonstrated problem calls for it.

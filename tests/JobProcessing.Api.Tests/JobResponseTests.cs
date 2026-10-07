@@ -77,11 +77,15 @@ public class JobResponseTests
             CreatedAtUtc: new DateTime(2026, 07, 03, 23, 45, 0, 0, DateTimeKind.Utc),
             UpdatedAtUtc: new DateTime(2026, 07, 03, 23, 45, 1, 0, DateTimeKind.Utc),
             RetryCount: 2,
-            CompletedAtUtc: new DateTime(2026, 07, 04, 00, 01, 0, 0, DateTimeKind.Utc)
+            CompletedAtUtc: new DateTime(2026, 07, 04, 00, 01, 0, 0, DateTimeKind.Utc),
+            WeatherObservedAtUtc: new DateTime(2026, 07, 04, 00, 00, 0, 0, DateTimeKind.Utc),
+            AirTemperatureCelsius: 13.8
         );
 
         var response = JobResponse.FromJobDetails(details);
 
         response.CompletedAt.Should().Be(details.CompletedAtUtc);
+        response.WeatherObservedAtUtc.Should().Be(details.WeatherObservedAtUtc);
+        response.AirTemperatureCelsius.Should().Be(details.AirTemperatureCelsius);
     }
 }

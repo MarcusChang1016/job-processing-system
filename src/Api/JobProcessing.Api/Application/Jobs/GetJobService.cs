@@ -27,7 +27,9 @@ public sealed class GetJobService
             job.CreatedAtUtc,
             job.UpdatedAtUtc,
             job.RetryCount,
-            job.CompletedAtUtc
+            job.CompletedAtUtc,
+            job.WeatherObservedAtUtc,
+            job.AirTemperatureCelsius
         );
     }
 }

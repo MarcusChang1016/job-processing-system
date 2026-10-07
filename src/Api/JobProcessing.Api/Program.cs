@@ -1,5 +1,6 @@
 using JobProcessing.Api.Application.Jobs;
 using JobProcessing.Api.Infrastructure;
+using JobProcessing.Api.Infrastructure.Weather;
 using JobProcessing.Api.Options;
 using JobProcessing.Api.Worker;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,11 @@ builder.Services.AddControllers();
 builder.Services.AddHostedService<JobWorker>();
 
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+
+builder.Services.AddHttpClient<BomWeatherClient>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 
 builder.Services.AddScoped<JobRetryPolicy>();
 builder.Services.AddScoped<JobExecutionResultHandler>();

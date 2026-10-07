@@ -22,4 +22,8 @@ public class JobEntity
 
     [Timestamp]
     public uint Version { get; set; }
+
+    public DateTime? WeatherObservedAtUtc { get; set; }
+
+    public double? AirTemperatureCelsius { get; set; }
 }

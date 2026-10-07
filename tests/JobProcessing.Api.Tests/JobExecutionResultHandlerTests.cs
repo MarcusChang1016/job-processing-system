@@ -1,9 +1,9 @@
 using FluentAssertions;
+using JobProcessing.Api.Application.Weather;
 using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure.Entities;
 using JobProcessing.Api.Options;
 using JobProcessing.Api.Worker;
-using Microsoft.Extensions.Options;
 
 namespace JobProcessing.Api.Tests;
 
@@ -22,6 +22,9 @@ public class JobExecutionResultHandlerTests
 
         var now = new DateTime(2026, 07, 06, 00, 00, 0, 0, DateTimeKind.Utc);
 
+        var observedAtUtc = now.AddMinutes(-10);
+        var observation = new WeatherObservation(observedAtUtc, 13.8);
+
         var job = new JobEntity
         {
             Id = Guid.NewGuid(),
@@ -31,7 +34,7 @@ public class JobExecutionResultHandlerTests
             ProcessingStartedAtUtc = now.AddMinutes(5),
         };
 
-        resultHandler.ApplySuccess(job, now);
+        resultHandler.ApplySuccess(job, observation, now);
 
         job.Status.Should().Be(JobStatus.Success);
         job.UpdatedAtUtc.Should().Be(now);
@@ -39,6 +42,8 @@ public class JobExecutionResultHandlerTests
         job.LastErrorMessage.Should().BeNull();
         job.NextRetryAtUtc.Should().BeNull();
         job.ProcessingStartedAtUtc.Should().BeNull();
+        job.WeatherObservedAtUtc.Should().Be(observedAtUtc);
+        job.AirTemperatureCelsius.Should().Be(13.8);
     }
 
     [Fact]

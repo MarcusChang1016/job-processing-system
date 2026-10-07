@@ -85,6 +85,12 @@ Its responsibilities are:
 - Delegate eligible pending job claiming to `JobClaimService`
 - Delegate claimed job processing to `JobProcessor`
 
+The current job fetches the latest Brisbane weather observation from the public
+Australian Bureau of Meteorology (BOM) API. It takes no input. On success, the job
+stores the observation time (`weatherObservedAtUtc`) and air temperature
+(`airTemperatureCelsius`), which `GET /jobs/{id}` returns. Fetch or parsing failures
+follow the existing retry policy; after the maximum attempts, the job is `Failed`.
+
 ### Persistence
 
 The project uses EF Core with PostgreSQL. Local development runs PostgreSQL through Docker Compose, while database-backed tests use disposable PostgreSQL containers through Testcontainers.
@@ -194,10 +200,10 @@ Database-backed tests create disposable PostgreSQL containers with Testcontainer
 
 ## Roadmap
 
-The next milestones build on the existing job lifecycle:
+The milestones build on the existing job lifecycle:
 
-1. Replace simulated execution with one deterministic job type, including success,
-   failure, retry, and cancellation tests.
+1. Completed: replace simulated execution with one fixed BOM weather job,
+   including success, failure, retry, and cancellation tests.
 2. Containerise the application and add CI build and test checks.
 3. Improve health signals, logging, and job metrics so failures can be diagnosed.
 4. Deploy the system and demonstrate recovery after an interrupted job.
@@ -212,7 +218,7 @@ This project is still evolving. Some known limitations are:
 
 - API and worker currently run in the same project and process, with folders separating API, application use cases, domain job rules, infrastructure, options, and worker pipeline code.
 - `JobWorker` still orchestrates the polling loop and scoped worker services; recovery, claiming, and processing are handled by dedicated services.
-- `JobExecutionService` still simulates work with a delay and random success or failure; no real job contract exists yet.
+- Only one fixed BOM weather job is supported; clients cannot choose a job type or provide input.
 - Test coverage currently includes state transitions, DTO mapping, retry policy, execution result handling, stuck job recovery, atomic job claiming and locked-row skipping, database-backed create, read, and manual retry service tests, and Jobs API integration tests.
 - The application itself is not containerised yet; Docker Compose currently provides PostgreSQL only.
 - CI/CD, authentication, and production observability are not implemented yet.

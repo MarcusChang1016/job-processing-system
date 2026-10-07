@@ -8,5 +8,7 @@ public sealed record JobDetails(
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
     int RetryCount,
-    DateTime? CompletedAtUtc
+    DateTime? CompletedAtUtc,
+    DateTime? WeatherObservedAtUtc = null,
+    double? AirTemperatureCelsius = null
 );

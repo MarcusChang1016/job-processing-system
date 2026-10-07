@@ -27,3 +27,43 @@ The PostgreSQL-specific SQL stays inside `JobClaimService`; its public interface
 - Selection and state transition are protected by one transaction.
 - Claiming is intentionally coupled to PostgreSQL.
 - The query should be measured under realistic load before adding an index or moving to a single-statement claim.
+
+## Use one fixed BOM weather job as the first real workload
+
+- Date: 2026-10-08
+- Status: Accepted
+
+### Context
+
+Random success and failure exercised the job state machine but could not show how
+a real external dependency produces a result or a retryable failure. The project
+is primarily for learning the processing system, not building a weather platform.
+
+### Decision
+
+Every submitted job fetches the latest Brisbane observation from the public BOM
+API. It takes no input. The client checks HTTP status and maps the observation's
+UTC timestamp and air temperature; success stores those values in nullable columns
+on `JobEntity` and exposes them through the job read response. Fetch or parsing
+errors use the existing retry policy. A request cancellation while the worker is
+still running counts as a failed attempt; worker shutdown cancellation propagates.
+
+### Alternatives considered
+
+- Keep random simulation: smaller, but no real HTTP, parsing, or result-persistence
+  behaviour to demonstrate.
+- Build a scheduled API/database-to-S3 pipeline: realistic, but adds scheduling,
+  storage, credentials, and data-transformation scope unrelated to this milestone.
+- Add generic job types and separate result storage now: more extensible, but adds
+  abstractions before a second job type or a larger result creates that need.
+
+### Consequences
+
+- The smallest end-to-end slice now covers an external HTTP call, validation,
+  persistence, API readback, retry, timeout, and cancellation tests.
+- Public BOM availability and data shape affect job success; the client has a
+  ten-second timeout and failures may exhaust the retry budget.
+- The result columns and worker are deliberately specific to this one job. Revisit
+  their shape if another job type creates real pressure; do not generalise early.
+- Repeating a fetch does not create an external write, though the latest BOM value
+  may change between attempts. This is not a general idempotency solution.

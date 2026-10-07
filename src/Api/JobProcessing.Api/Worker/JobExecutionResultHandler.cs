@@ -1,3 +1,4 @@
+using JobProcessing.Api.Application.Weather;
 using JobProcessing.Api.Domain.Jobs;
 using JobProcessing.Api.Infrastructure.Entities;
 
@@ -12,7 +13,7 @@ public class JobExecutionResultHandler
         _jobRetryPolicy = jobRetryPolicy;
     }
 
-    public void ApplySuccess(JobEntity job, DateTime now)
+    public void ApplySuccess(JobEntity job, WeatherObservation observation, DateTime now)
     {
         job.Status = JobStatus.Success;
         job.UpdatedAtUtc = now;
@@ -20,6 +21,8 @@ public class JobExecutionResultHandler
         job.LastErrorMessage = null;
         job.NextRetryAtUtc = null;
         job.ProcessingStartedAtUtc = null;
+        job.WeatherObservedAtUtc = observation.ObservedAtUtc;
+        job.AirTemperatureCelsius = observation.AirTemperatureCelsius;
     }
 
     public void ApplyFailure(JobEntity job, string errorMessage, DateTime now)
